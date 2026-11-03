@@ -64,6 +64,7 @@ import dev.russell.yagi.activity.DriveModeActivity;
 import dev.russell.yagi.activity.LockScreenActivity;
 import dev.russell.yagi.activity.MainActivity;
 import dev.russell.yagi.core.adskip.AdAnalysisWorker;
+import dev.russell.yagi.core.adskip.TranscriptAdAnalysis;
 import dev.russell.yagi.core.feed.util.AdSkipUtils;
 import dev.russell.yagi.core.feed.util.PlaybackSpeedUtils;
 import dev.russell.yagi.core.playback.NowPlayingScreen;
@@ -1107,9 +1108,10 @@ public class AudioPlayerFragment extends Fragment implements
     }
 
     /**
-     * Runs detection on demand. A downloaded episode gets the full audio analysis through
-     * WorkManager; a streamed one can only be matched against its chapter titles, which is cheap
-     * but still touches the database, so it runs off the main thread.
+     * Runs detection on demand. A downloaded episode gets the full analysis through WorkManager,
+     * and so does a streamed one with a transcript to read (chapters and transcript only); any
+     * other streamed one can only be matched against its chapter titles, which is cheap but still
+     * touches the database, so it runs off the main thread.
      */
     private void analyzeAds(Playable media, @Nullable FeedItem feedItem) {
         if (!(media instanceof FeedMedia) || feedItem == null) {
@@ -1117,7 +1119,8 @@ public class AudioPlayerFragment extends Fragment implements
         }
         FeedMedia feedMedia = (FeedMedia) media;
         Context context = requireContext().getApplicationContext();
-        if (feedMedia.isDownloaded()) {
+        if (feedMedia.isDownloaded()
+                || (feedItem.hasTranscript() && TranscriptAdAnalysis.wantedMethod() != null)) {
             AdAnalysisWorker.enqueue(context, feedMedia.getId(), true);
         } else {
             if (adAnalysisDisposable != null) {

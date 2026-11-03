@@ -758,7 +758,25 @@
 
   <!-- Ad auto-skip -->
   <string name="detect_ads">偵測廣告</string>
-  <string name="pref_ad_skip_enabled_sum">所有播客的預設值。你可以在播放器的音效調整或播客設定中，為單一播客個別開啟或關閉。偵測會辨識廣告時段下的背景音樂與贊助商章節，並跳過找到的內容；它可能漏掉廣告，也可能多跳過一點。</string>
+  <string name="pref_ad_skip_enabled_sum">所有播客的預設值。你可以在播放器的音效調整或播客設定中，為單一播客個別開啟或關閉。偵測會讀取單集的逐字稿（如有），辨識廣告時段下的背景音樂與贊助商章節，並跳過找到的內容；它可能漏掉廣告，也可能多跳過一點。</string>
+  <string name="pref_ad_skip_use_transcripts_title">讀取逐字稿</string>
+  <string name="pref_ad_skip_use_transcripts_sum">播客提供逐字稿時，在逐字稿中尋找贊助商口播廣告。串流播放的單集也適用。</string>
+  <string name="pref_ad_skip_claude_key_title">Claude API 金鑰</string>
+  <string name="pref_ad_skip_claude_key_sum_unset">未設定。逐字稿在手機上讀取。使用你自己的 Anthropic API 金鑰後，將改由 Claude Haiku 讀取逐字稿，能找到更多廣告；屆時每集的逐字稿都會傳送給 Anthropic（每小時音訊約三分之一美分）。</string>
+  <string name="pref_ad_skip_claude_key_sum_set">已設定。逐字稿會傳送給 Anthropic 的 Claude Haiku 以尋找廣告。</string>
+  <string name="claude_api_key_dialog_message">請貼上你自己 Anthropic 帳戶的 API 金鑰，可在 console.anthropic.com 的 API Keys 頁面建立。金鑰只會儲存在這支手機上，不會包含在備份與匯出中。設定金鑰後，每集的逐字稿都會傳送給 Anthropic，費用約為每小時音訊三分之一美分，由你的帳戶支付。</string>
+  <string name="claude_api_key_hint">API 金鑰</string>
+  <string name="claude_api_key_remove">移除</string>
+  <string name="claude_api_key_checking">正在驗證金鑰\u2026</string>
+  <string name="claude_api_key_rejected">Anthropic 不接受此金鑰</string>
+  <string name="claude_api_key_saved">已儲存 API 金鑰</string>
+  <string name="claude_api_key_saved_unchecked">已儲存 API 金鑰，但無法驗證。請檢查網路連線。</string>
+  <string name="claude_api_key_removed">已移除 API 金鑰</string>
+  <string name="pref_ad_skip_self_promo_title">跳過節目自身的宣傳</string>
+  <string name="pref_ad_skip_self_promo_sum">同時跳過節目為自己尋求支持的部分：會員、Patreon、周邊商品、電子報。需要逐字稿。</string>
+  <string name="ad_segment_source_transcript_confidence">逐字稿 %1$d%%</string>
+  <string name="ad_segment_source_self_promo_confidence">節目宣傳 %1$d%%</string>
+  <string name="ad_segments_empty">尚無廣告片段。開啟跳過廣告後，已下載的單集與有逐字稿的單集會自動分析。</string>
   <string name="feed_ad_skip_default_on">使用預設值（開啟）</string>
   <string name="feed_ad_skip_default_off">使用預設值（關閉）</string>
   <string name="feed_ad_skip_on">開啟</string>
@@ -819,7 +837,7 @@
   <string name="pref_episode_lists_category">單集列表</string>
   <string name="pref_appearance_sum">主題、顏色、版面、播放畫面、滑動操作</string>
   <string name="pref_ad_skip_category">跳過廣告</string>
-  <string name="pref_ad_skip_sum">偵測並跳過已下載單集中的廣告</string>
+  <string name="pref_ad_skip_sum">透過逐字稿、章節與音訊偵測並跳過廣告</string>
   <string name="pref_sync_backup_title">同步與備份</string>
   <string name="pref_sync_backup_sum">gpodder.net 或 Nextcloud 同步、資料庫備份、OPML 匯入和匯出</string>
   <string name="pref_downloads_storage_title">下載與儲存</string>

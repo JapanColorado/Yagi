@@ -95,6 +95,9 @@ object Prefs {
     const val PREF_AD_SKIP_ANALYZE_ON_DOWNLOAD = "pref_ad_skip_analyze_on_download"
     const val PREF_AD_SKIP_SHOW_SNACKBAR = "pref_ad_skip_show_snackbar"
     const val PREF_AD_SKIP_ANALYZED_MEDIA = "pref_ad_skip_analyzed_media"
+    const val PREF_AD_SKIP_USE_TRANSCRIPTS = "pref_ad_skip_use_transcripts"
+    const val PREF_AD_SKIP_SELF_PROMO = "pref_ad_skip_self_promo"
+    const val PREF_AD_SKIP_TRANSCRIPT_ANALYZED = "pref_ad_skip_transcript_analyzed"
 
     // Network
     const val PREF_UPDATE_INTERVAL = "pref_auto_refresh_interval"
@@ -697,6 +700,42 @@ object Prefs {
     /** Remembers that the ad analysis completed for a media id. */
     @JvmStatic
     fun markAdAnalyzed(mediaId: Long) = AdSkipPrefs.markAdAnalyzed(mediaId)
+
+    /** Whether transcripts are searched for sponsor reads (default on); see [AdSkipPrefs]. */
+    @JvmStatic
+    var isAdSkipUseTranscripts: Boolean
+        get() = AdSkipPrefs.isAdSkipUseTranscripts
+        set(use) {
+            AdSkipPrefs.isAdSkipUseTranscripts = use
+        }
+
+    /** Whether the show's promotions of itself are skipped too (default off). */
+    @JvmStatic
+    var isAdSkipSelfPromo: Boolean
+        get() = AdSkipPrefs.isAdSkipSelfPromo
+        set(skip) {
+            AdSkipPrefs.isAdSkipSelfPromo = skip
+        }
+
+    /** The user's Anthropic API key, trimmed, or null when none is set. */
+    @JvmStatic
+    fun getClaudeApiKey(): String? = AdSkipPrefs.getClaudeApiKey()
+
+    /** Stores the Anthropic API key; null or blank removes it. */
+    @JvmStatic
+    fun setClaudeApiKey(key: String?) = AdSkipPrefs.setClaudeApiKey(key)
+
+    @JvmStatic
+    fun hasClaudeApiKey(): Boolean = AdSkipPrefs.hasClaudeApiKey()
+
+    /** How a media id's transcript was last analysed for ads, or null if never. */
+    @JvmStatic
+    fun getTranscriptAdMethod(mediaId: Long): String? = AdSkipPrefs.getTranscriptAdMethod(mediaId)
+
+    /** Records how a media id's transcript was analysed, replacing any earlier entry. */
+    @JvmStatic
+    fun setTranscriptAdMethod(mediaId: Long, method: String) =
+        AdSkipPrefs.setTranscriptAdMethod(mediaId, method)
 
     fun shouldShowColumnInLandscape(): Boolean = UiPrefs.shouldShowColumnInLandscape()
 

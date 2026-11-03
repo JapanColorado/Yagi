@@ -892,7 +892,7 @@
     <!-- Ad auto-skip -->
     <string name="pref_ad_skip_category">Ad skipping</string>
     <string name="detect_ads">Detect ads</string>
-    <string name="pref_ad_skip_enabled_sum">Default for all podcasts. You can turn it on or off for a single podcast from the player\'s audio effects or the podcast\'s settings. Detection listens for the music bed under ad breaks and for sponsor chapters, and skips what it finds; it can miss an ad or skip a little too much.</string>
+    <string name="pref_ad_skip_enabled_sum">Default for all podcasts. You can turn it on or off for a single podcast from the player\'s audio effects or the podcast\'s settings. Detection reads the transcript when there is one, listens for the music bed under ad breaks and looks for sponsor chapters, and skips what it finds; it can miss an ad or skip a little too much.</string>
     <string name="pref_ad_skip_sensitivity_title">Detection sensitivity</string>
     <string name="pref_ad_skip_sensitivity_sum">How eagerly detected ads are skipped: %1$s</string>
     <string name="ad_skip_sensitivity_low">Low (only clear ads)</string>
@@ -922,7 +922,7 @@
     <string name="analyze_ads_started">Looking for ads in this episode\u2026</string>
     <string name="ad_skipped_snackbar">Skipped a %1$s ad</string>
     <string name="ad_segments_title">Ad segments</string>
-    <string name="ad_segments_empty">No ad segments yet. Downloaded episodes are analysed automatically when ad skipping is on.</string>
+    <string name="ad_segments_empty">No ad segments yet. When ad skipping is on, downloaded episodes and episodes with a transcript are analysed automatically.</string>
     <string name="ad_segment_range">%1$s \u2013 %2$s</string>
     <string name="ad_segment_source_chapter">Chapter</string>
     <string name="ad_segment_source_manual">Manual</string>
@@ -930,6 +930,23 @@
     <string name="ad_segment_source_detected_confidence">Detected %1$d%%</string>
     <string name="ad_segment_delete_label">Delete this ad segment</string>
     <string name="ad_segment_enabled_label">Skip this ad segment</string>
+    <string name="pref_ad_skip_use_transcripts_title">Read transcripts</string>
+    <string name="pref_ad_skip_use_transcripts_sum">Look for sponsor reads in the transcript when the podcast publishes one. This also works for streamed episodes.</string>
+    <string name="pref_ad_skip_claude_key_title">Claude API key</string>
+    <string name="pref_ad_skip_claude_key_sum_unset">Not set. Transcripts are read on the phone. With your own Anthropic API key, Claude Haiku reads them instead and finds more ads; each episode\'s transcript is then sent to Anthropic (about a third of a US cent per hour of audio).</string>
+    <string name="pref_ad_skip_claude_key_sum_set">Set. Transcripts are sent to Anthropic\'s Claude Haiku to find ads.</string>
+    <string name="claude_api_key_dialog_message">Paste an API key from your own Anthropic account. You can create one at console.anthropic.com under API keys. The key stays on this phone and is left out of backups and exports. With a key, each episode\'s transcript is sent to Anthropic, which bills your account about a third of a US cent per hour of audio.</string>
+    <string name="claude_api_key_hint">API key</string>
+    <string name="claude_api_key_remove">Remove</string>
+    <string name="claude_api_key_checking">Checking the key\u2026</string>
+    <string name="claude_api_key_rejected">Anthropic did not accept this key</string>
+    <string name="claude_api_key_saved">API key saved</string>
+    <string name="claude_api_key_saved_unchecked">API key saved, but it could not be checked. Check your connection.</string>
+    <string name="claude_api_key_removed">API key removed</string>
+    <string name="pref_ad_skip_self_promo_title">Skip the show\'s own promotions</string>
+    <string name="pref_ad_skip_self_promo_sum">Also skip the parts where the show asks for support for itself: memberships, Patreon, merchandise, newsletters. Needs a transcript.</string>
+    <string name="ad_segment_source_transcript_confidence">Transcript %1$d%%</string>
+    <string name="ad_segment_source_self_promo_confidence">Show promotion %1$d%%</string>
 
     <string name="reset_to_default">Reset to default</string>
     <string name="podcast_own_settings_applied">Using this podcast\'s own settings</string>
@@ -983,7 +1000,7 @@
     <string name="pref_layout_navigation_category">Layout &amp; navigation</string>
     <string name="pref_episode_lists_category">Episode lists</string>
     <string name="pref_appearance_sum">Theme, colors, layout, player screen, swipe actions</string>
-    <string name="pref_ad_skip_sum">Detect and skip ads in downloaded episodes</string>
+    <string name="pref_ad_skip_sum">Detect and skip ads using transcripts, chapters and the audio</string>
     <string name="pref_sync_backup_title">Sync &amp; backup</string>
     <string name="pref_sync_backup_sum">gpodder.net or Nextcloud sync, database backup, OPML import and export</string>
     <string name="pref_downloads_storage_title">Downloads &amp; storage</string>

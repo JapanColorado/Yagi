@@ -497,7 +497,25 @@
   <!--On-Demand configuration-->
   <!-- Ad auto-skip -->
   <string name="detect_ads">広告を検出</string>
-  <string name="pref_ad_skip_enabled_sum">すべてのポッドキャストの既定値です。プレーヤーのオーディオエフェクトやポッドキャストの設定から、ポッドキャストごとにオン・オフを切り替えられます。広告枠の背景音楽とスポンサーのチャプターを検出してスキップしますが、広告を見逃したり、少し余分にスキップしたりすることがあります。</string>
+  <string name="pref_ad_skip_enabled_sum">すべてのポッドキャストの既定値です。プレーヤーのオーディオエフェクトやポッドキャストの設定から、ポッドキャストごとにオン・オフを切り替えられます。文字起こしがあればそれを読み、広告枠の背景音楽とスポンサーのチャプターも検出してスキップしますが、広告を見逃したり、少し余分にスキップしたりすることがあります。</string>
+  <string name="pref_ad_skip_use_transcripts_title">文字起こしを読む</string>
+  <string name="pref_ad_skip_use_transcripts_sum">ポッドキャストが文字起こしを公開している場合、その中からスポンサーの読み上げ広告を探します。ストリーミング再生のエピソードにも使えます。</string>
+  <string name="pref_ad_skip_claude_key_title">Claude API キー</string>
+  <string name="pref_ad_skip_claude_key_sum_unset">未設定。文字起こしは端末上で読み取ります。ご自身の Anthropic API キーを設定すると、代わりに Claude Haiku が文字起こしを読み、より多くの広告を見つけます。その場合、各エピソードの文字起こしが Anthropic に送信されます（音声 1 時間あたり約 0.3 米セント）。</string>
+  <string name="pref_ad_skip_claude_key_sum_set">設定済み。広告を探すため、文字起こしを Anthropic の Claude Haiku に送信します。</string>
+  <string name="claude_api_key_dialog_message">ご自身の Anthropic アカウントの API キーを貼り付けてください。キーは console.anthropic.com の API Keys で作成できます。キーはこの端末にのみ保存され、バックアップやエクスポートには含まれません。キーを設定すると、各エピソードの文字起こしが Anthropic に送信され、音声 1 時間あたり約 0.3 米セントがご自身のアカウントに請求されます。</string>
+  <string name="claude_api_key_hint">API キー</string>
+  <string name="claude_api_key_remove">削除</string>
+  <string name="claude_api_key_checking">キーを確認しています\u2026</string>
+  <string name="claude_api_key_rejected">Anthropic がこのキーを受け付けませんでした</string>
+  <string name="claude_api_key_saved">API キーを保存しました</string>
+  <string name="claude_api_key_saved_unchecked">API キーを保存しましたが、確認できませんでした。接続を確認してください。</string>
+  <string name="claude_api_key_removed">API キーを削除しました</string>
+  <string name="pref_ad_skip_self_promo_title">番組自身の宣伝をスキップ</string>
+  <string name="pref_ad_skip_self_promo_sum">番組が自身への支援を呼びかける部分（メンバーシップ、Patreon、グッズ、ニュースレター）もスキップします。文字起こしが必要です。</string>
+  <string name="ad_segment_source_transcript_confidence">文字起こし %1$d%%</string>
+  <string name="ad_segment_source_self_promo_confidence">番組の宣伝 %1$d%%</string>
+  <string name="ad_segments_empty">広告区間はまだありません。広告スキップがオンの場合、ダウンロード済みのエピソードと文字起こしのあるエピソードは自動的に分析されます。</string>
   <string name="feed_ad_skip_default_on">既定値を使用（オン）</string>
   <string name="feed_ad_skip_default_off">既定値を使用（オフ）</string>
   <string name="feed_ad_skip_on">オン</string>
@@ -558,7 +576,7 @@
   <string name="pref_episode_lists_category">エピソードリスト</string>
   <string name="pref_appearance_sum">テーマ、色、レイアウト、再生画面、スワイプ操作</string>
   <string name="pref_ad_skip_category">広告スキップ</string>
-  <string name="pref_ad_skip_sum">ダウンロード済みエピソードの広告を検出してスキップ</string>
+  <string name="pref_ad_skip_sum">文字起こし、チャプター、音声から広告を検出してスキップ</string>
   <string name="pref_sync_backup_title">同期とバックアップ</string>
   <string name="pref_sync_backup_sum">gpodder.net または Nextcloud との同期、データベースのバックアップ、OPML のインポートとエクスポート</string>
   <string name="pref_downloads_storage_title">ダウンロードとストレージ</string>

@@ -39,13 +39,14 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
 /**
- * Runs {@link AdAnalyzer} over one downloaded episode in the background and stores the result.
+ * Runs ad detection over one episode in the background and stores the result: the chapters, the
+ * published transcript ({@link TranscriptAdAnalysis}) and, for a downloaded episode, the audio
+ * ({@link AdAnalyzer}). A streamed episode with a transcript gets the first two.
  *
  * <p>This class owns the <em>scheduling</em> side of ad detection: when analysis is worth running
- * ({@link #enqueue}), how it is identified to WorkManager (one unique work name per media id) and
- * how its output is split by {@link AdSegment.Source} into the two rows the storage layer keeps
- * separate. It owns none of the detection itself; everything audio-related lives in
- * {@link AdAnalyzer} and its collaborators.
+ * ({@link #enqueue}, {@link #enqueueOnPlayback}), how it is identified to WorkManager (one unique
+ * work name per media id) and how its output is split by {@link AdSegment.Source} into the rows
+ * the storage layer keeps separate. It owns none of the detection itself.
  *
  * <p>Detected segments are stored with whatever confidence the detector reported, deliberately
  * unfiltered: the user's sensitivity setting is applied at playback time, so lowering it does not
@@ -89,15 +90,30 @@ public class AdAnalysisWorker extends Worker {
             return Result.failure();
         }
         String filePath = media.getFile_url();
-        if (!media.isDownloaded() || filePath == null || !new File(filePath).exists()) {
-            Log.d(TAG, "Media " + mediaId + " is not downloaded, nothing to analyse");
-            return Result.failure();
-        }
+        boolean downloaded = media.isDownloaded() && filePath != null && new File(filePath).exists();
 
         // Publish whatever the chapters already say before spending minutes on the audio, so that
         // an episode played right after its download can skip labelled breaks immediately.
         List<Chapter> chapters = loadChapters(item);
         storeChapterSegments(item, chapters);
+
+        // The transcript is quick to read (a download and at most one request to Claude), and for
+        // a streamed episode it is all there is; its findings are published before the audio's.
+        TranscriptReading transcript = TranscriptAdAnalysis.read(item, media.getDuration());
+        if (transcript != null && !storeTranscriptSegments(item, transcript, chapters, media)) {
+            return Result.failure();
+        }
+        if (!downloaded) {
+            if (transcript == null) {
+                Log.d(TAG, "Media " + mediaId + " is not downloaded and has no readable"
+                        + " transcript, nothing to analyse");
+                return Result.failure();
+            }
+            Prefs.setTranscriptAdMethod(mediaId, transcript.getMethod());
+            Log.i(TAG, "Read the transcript of " + media.getEpisodeTitle() + " ("
+                    + transcript.getMethod() + "): " + transcript.getSegments().size() + " segments");
+            return Result.success();
+        }
 
         // Decoding a two hour episode takes minutes of CPU. A plain background job is stopped by
         // the system after about ten minutes, and sooner on some devices when the app is not in
@@ -108,7 +124,7 @@ public class AdAnalysisWorker extends Worker {
         List<AdSegment> segments;
         try {
             segments = new AdAnalyzer().analyze(filePath, item.getId(), media.getDuration(),
-                    chapters, this::isStopped);
+                    chapters, transcript, this::isStopped);
         } catch (DecodeException e) {
             Log.e(TAG, "Could not analyse " + media.getEpisodeTitle(), e);
             return Result.failure();
@@ -123,23 +139,61 @@ public class AdAnalysisWorker extends Worker {
             return Result.failure();
         }
 
-        try {
-            DBWriter.replaceAdSegments(item.getId(), AdSegment.Source.DETECTED,
-                    segmentsOf(segments, AdSegment.Source.DETECTED)).get();
-            DBWriter.replaceAdSegments(item.getId(), AdSegment.Source.CHAPTER,
-                    segmentsOf(segments, AdSegment.Source.CHAPTER)).get();
-        } catch (InterruptedException e) {
-            Log.e(TAG, "Interrupted while storing ad segments");
-            Thread.currentThread().interrupt();
-            return Result.failure();
-        } catch (ExecutionException e) {
-            Log.e(TAG, "Could not store the ad segments of " + media.getEpisodeTitle(), e);
+        AdSegment.Source[] stored = transcript != null ? ALL_ANALYSED_SOURCES : AUDIO_SOURCES;
+        if (!store(item, segments, stored, media)) {
             return Result.failure();
         }
         Prefs.markAdAnalyzed(mediaId);
+        // A transcript that could not be fetched is not tried again for this download: playing
+        // the episode would otherwise repeat the whole audio analysis each time.
+        if (transcript != null) {
+            Prefs.setTranscriptAdMethod(mediaId, transcript.getMethod());
+        } else if (TranscriptAdAnalysis.wantedMethod() != null) {
+            Prefs.setTranscriptAdMethod(mediaId, TranscriptReading.METHOD_NONE);
+        }
         Log.i(TAG, "Analysed " + media.getEpisodeTitle() + " in " + elapsedMs / 1000 + " s: "
                 + segments.size() + " segments");
         return Result.success();
+    }
+
+    /** What an audio analysis without a transcript reading replaces. */
+    private static final AdSegment.Source[] AUDIO_SOURCES = {
+            AdSegment.Source.DETECTED, AdSegment.Source.CHAPTER};
+    /** What an audio analysis with a transcript reading replaces. */
+    private static final AdSegment.Source[] ALL_ANALYSED_SOURCES = {
+            AdSegment.Source.DETECTED, AdSegment.Source.CHAPTER, AdSegment.Source.TRANSCRIPT,
+            AdSegment.Source.SELF_PROMO};
+    /** What a transcript reading replaces. */
+    private static final AdSegment.Source[] TRANSCRIPT_SOURCES = {
+            AdSegment.Source.TRANSCRIPT, AdSegment.Source.SELF_PROMO};
+
+    /** Stores the transcript's findings, trimmed where chapters overrule them. */
+    private static boolean storeTranscriptSegments(@NonNull FeedItem item,
+                                                   @NonNull TranscriptReading transcript,
+                                                   @Nullable List<Chapter> chapters,
+                                                   @NonNull FeedMedia media) {
+        long durationMs = media.getDuration();
+        List<AdSegment> merged = AdSegmentMerger.merge(null, transcript.getSegments(),
+                ChapterAdMatcher.match(chapters, durationMs, item.getId()), null);
+        return store(item, merged, TRANSCRIPT_SOURCES, media);
+    }
+
+    /** Replaces the episode's segments of each of {@code sources} with those in {@code segments}. */
+    private static boolean store(@NonNull FeedItem item, @NonNull List<AdSegment> segments,
+                                 @NonNull AdSegment.Source[] sources, @NonNull FeedMedia media) {
+        try {
+            for (AdSegment.Source source : sources) {
+                DBWriter.replaceAdSegments(item.getId(), source, segmentsOf(segments, source)).get();
+            }
+            return true;
+        } catch (InterruptedException e) {
+            Log.e(TAG, "Interrupted while storing ad segments");
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (ExecutionException e) {
+            Log.e(TAG, "Could not store the ad segments of " + media.getEpisodeTitle(), e);
+            return false;
+        }
     }
 
     /**
@@ -183,11 +237,13 @@ public class AdAnalysisWorker extends Worker {
     }
 
     /**
-     * Queues an analysis for a downloaded episode that is playing and has never been analysed, so
-     * that a library downloaded before ad skipping was switched on (globally or for its feed) still
-     * gets covered without the user asking episode by episode. The first check uses the in-memory
-     * feed preferences of {@code media}; the database check runs off the main thread. An episode
-     * analysed once, even with nothing found, is never re-analysed by this path.
+     * Queues an analysis for an episode that is starting to play: a downloaded one whose audio was
+     * never analysed, or any episode with a transcript that the current settings want read and
+     * that has not been read that way (a streamed episode, or a key added since), so that a library
+     * from before ad skipping was switched on (globally or for its feed) still gets covered without
+     * the user asking episode by episode. The first check uses the in-memory feed preferences of
+     * {@code media}; the database check runs off the main thread. An episode analysed once, even
+     * with nothing found, is not re-analysed by this path unless the settings now ask for more.
      *
      * @return the subscription doing the work, for the caller to own, or null when there was
      *         nothing to do.
@@ -195,8 +251,11 @@ public class AdAnalysisWorker extends Worker {
     @Nullable
     public static Disposable enqueueOnPlayback(@NonNull Context context,
                                                @Nullable FeedMedia media) {
-        if (media == null || media.getId() <= 0 || !media.isDownloaded()
-                || !AdSkipUtils.isAdSkipEnabled(media) || Prefs.isAdAnalyzed(media.getId())) {
+        if (media == null || media.getId() <= 0 || !AdSkipUtils.isAdSkipEnabled(media)) {
+            return null;
+        }
+        boolean audioPending = media.isDownloaded() && !Prefs.isAdAnalyzed(media.getId());
+        if (!audioPending && !TranscriptAdAnalysis.needsReading(media.getItem(), media.getId())) {
             return null;
         }
         final Context applicationContext = context.getApplicationContext();
@@ -232,7 +291,8 @@ public class AdAnalysisWorker extends Worker {
     }
 
     /**
-     * Queues an analysis run for one downloaded episode.
+     * Queues an analysis run for one episode: the full analysis when it is downloaded, the
+     * chapters and transcript only when it is not.
      *
      * <p>Unless {@code force} is set this first checks that ad skipping is on for the episode's
      * feed (its own choice, else the global default), which reads the episode from the database;

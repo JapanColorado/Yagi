@@ -806,7 +806,25 @@
 
   <!-- Ad auto-skip -->
   <string name="detect_ads">检测广告</string>
-  <string name="pref_ad_skip_enabled_sum">所有播客的默认设置。你可以在播放器的音频效果或播客设置中为单个播客单独开启或关闭。检测会识别广告时段下的背景音乐和赞助商章节，并跳过找到的内容；它可能漏掉广告，也可能多跳过一点。</string>
+  <string name="pref_ad_skip_enabled_sum">所有播客的默认设置。你可以在播放器的音频效果或播客设置中为单个播客单独开启或关闭。检测会读取单集的文字稿（如有），识别广告时段下的背景音乐和赞助商章节，并跳过找到的内容；它可能漏掉广告，也可能多跳过一点。</string>
+  <string name="pref_ad_skip_use_transcripts_title">读取文字稿</string>
+  <string name="pref_ad_skip_use_transcripts_sum">播客提供文字稿时，在文字稿中查找赞助商口播广告。流式播放的单集也适用。</string>
+  <string name="pref_ad_skip_claude_key_title">Claude API 密钥</string>
+  <string name="pref_ad_skip_claude_key_sum_unset">未设置。文字稿在手机上读取。使用你自己的 Anthropic API 密钥后，将改由 Claude Haiku 读取文字稿，能找到更多广告；届时每集的文字稿都会发送给 Anthropic（每小时音频约三分之一美分）。</string>
+  <string name="pref_ad_skip_claude_key_sum_set">已设置。文字稿会发送给 Anthropic 的 Claude Haiku 以查找广告。</string>
+  <string name="claude_api_key_dialog_message">请粘贴你自己 Anthropic 账户的 API 密钥，可在 console.anthropic.com 的 API Keys 页面创建。密钥只保存在本机，不会包含在备份和导出中。设置密钥后，每集的文字稿都会发送给 Anthropic，费用约为每小时音频三分之一美分，由你的账户支付。</string>
+  <string name="claude_api_key_hint">API 密钥</string>
+  <string name="claude_api_key_remove">移除</string>
+  <string name="claude_api_key_checking">正在验证密钥\u2026</string>
+  <string name="claude_api_key_rejected">Anthropic 不接受此密钥</string>
+  <string name="claude_api_key_saved">已保存 API 密钥</string>
+  <string name="claude_api_key_saved_unchecked">已保存 API 密钥，但无法验证。请检查网络连接。</string>
+  <string name="claude_api_key_removed">已移除 API 密钥</string>
+  <string name="pref_ad_skip_self_promo_title">跳过节目自身的推广</string>
+  <string name="pref_ad_skip_self_promo_sum">同时跳过节目为自己寻求支持的部分：会员、Patreon、周边商品、邮件通讯。需要文字稿。</string>
+  <string name="ad_segment_source_transcript_confidence">文字稿 %1$d%%</string>
+  <string name="ad_segment_source_self_promo_confidence">节目推广 %1$d%%</string>
+  <string name="ad_segments_empty">暂无广告片段。开启跳过广告后，已下载的单集和有文字稿的单集会自动分析。</string>
   <string name="feed_ad_skip_default_on">使用默认设置（开启）</string>
   <string name="feed_ad_skip_default_off">使用默认设置（关闭）</string>
   <string name="feed_ad_skip_on">开启</string>
@@ -867,7 +885,7 @@
   <string name="pref_episode_lists_category">单集列表</string>
   <string name="pref_appearance_sum">主题、颜色、布局、播放界面、滑动操作</string>
   <string name="pref_ad_skip_category">跳过广告</string>
-  <string name="pref_ad_skip_sum">检测并跳过已下载单集中的广告</string>
+  <string name="pref_ad_skip_sum">通过文字稿、章节和音频检测并跳过广告</string>
   <string name="pref_sync_backup_title">同步与备份</string>
   <string name="pref_sync_backup_sum">gpodder.net 或 Nextcloud 同步、数据库备份、OPML 导入和导出</string>
   <string name="pref_downloads_storage_title">下载与存储</string>

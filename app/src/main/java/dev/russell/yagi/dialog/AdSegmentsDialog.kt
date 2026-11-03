@@ -130,6 +130,14 @@ class AdSegmentsDialog : DialogFragment() {
             R.string.ad_segment_source_detected_confidence,
             (segment.confidence * PERCENT).roundToInt()
         )
+        AdSegment.Source.TRANSCRIPT -> getString(
+            R.string.ad_segment_source_transcript_confidence,
+            (segment.confidence * PERCENT).roundToInt()
+        )
+        AdSegment.Source.SELF_PROMO -> getString(
+            R.string.ad_segment_source_self_promo_confidence,
+            (segment.confidence * PERCENT).roundToInt()
+        )
         AdSegment.Source.CHAPTER -> getString(R.string.ad_segment_source_chapter)
         AdSegment.Source.MANUAL -> getString(R.string.ad_segment_source_manual)
     }

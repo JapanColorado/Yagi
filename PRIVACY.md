@@ -13,6 +13,7 @@ Yagi only connects to other services to do what you ask it to:
 - **Podcast publishers and their hosts:** fetching feeds, episodes, cover images, chapters and transcripts. These requests come from your device, so those servers see your IP address, as with any download.
 - **Podcast search:** what you type in the search box goes to the directories that answer it: Apple's iTunes Search API, Podcast Index and fyyd. Browsing top lists also uses Apple's iTunes API.
 - **Synchronisation, only if you set it up:** gpodder.net or your own Nextcloud server, with the credentials you enter.
+- **Anthropic, only if you enter your own API key** (Settings > Ad skipping > Claude API key): to find ads, the podcast's title, the episode's title and the text of the episode's published transcript are sent to Anthropic's Claude API, under your Anthropic account and its terms. Nothing else is sent, and nothing at all for episodes without a transcript. Without a key, transcripts are read on your device. The key is kept out of the app's settings export and device backups.
 
 ## Bug reports
 

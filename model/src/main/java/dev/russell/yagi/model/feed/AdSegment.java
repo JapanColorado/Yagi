@@ -4,15 +4,23 @@ import androidx.annotation.NonNull;
 
 /**
  * A time range inside an episode that the app treats as an advertisement and skips during
- * playback. Segments come from three sources: the offline audio analysis run after a download
+ * playback. Segments come from four sources: the offline audio analysis run after a download
  * ({@link Source#DETECTED}), chapter titles that look like sponsor breaks ({@link Source#CHAPTER}),
- * or the user marking a range by hand in the player ({@link Source#MANUAL}). Manual segments
- * always have a confidence of 1 and take precedence over overlapping detected ones.
+ * a reading of the episode's published transcript ({@link Source#TRANSCRIPT}), or the user marking
+ * a range by hand in the player ({@link Source#MANUAL}). Manual segments always have a confidence
+ * of 1 and take precedence over overlapping detected ones. The transcript reading also finds the
+ * show's own promotions ({@link Source#SELF_PROMO}), which are stored the same way but skipped
+ * only on request.
  */
 public class AdSegment {
 
     public enum Source {
-        DETECTED(0), CHAPTER(1), MANUAL(2);
+        DETECTED(0), CHAPTER(1), MANUAL(2), TRANSCRIPT(3),
+        /**
+         * Not an ad: the show asking for support for itself (its membership, merchandise,
+         * newsletter), found in the transcript. Skipped only when the user asks for it.
+         */
+        SELF_PROMO(4);
 
         private final int code;
 

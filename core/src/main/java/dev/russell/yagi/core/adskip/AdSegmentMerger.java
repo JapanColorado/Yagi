@@ -13,9 +13,11 @@ import dev.russell.yagi.model.feed.AdSegment;
 /**
  * Reconciles ad segments coming from different sources into one sorted, non-overlapping list.
  *
- * <p>Three sources disagree in practice: the user's own marks, the publisher's chapter titles and
- * the audio analysis. They are ranked MANUAL &gt; CHAPTER &gt; DETECTED, on the principle that a
- * statement beats a label and a label beats a guess.
+ * <p>Four sources disagree in practice: the user's own marks, the publisher's chapter titles, the
+ * reading of the transcript and the audio analysis. They are ranked MANUAL &gt; CHAPTER &gt;
+ * TRANSCRIPT &gt; DETECTED, on the principle that a statement beats a label, a label beats what
+ * was said, and what was said beats what it sounded like. The show's own promotions
+ * (SELF_PROMO) come last: they are not ads, and only fill gaps.
  *
  * <p>Within one source, overlapping or touching segments are unioned and keep the highest
  * confidence. Across sources, a lower-ranked segment has the higher-ranked ranges *subtracted* from
@@ -38,9 +40,21 @@ public final class AdSegmentMerger {
     public static List<AdSegment> merge(@Nullable List<AdSegment> detected,
                                         @Nullable List<AdSegment> chapter,
                                         @Nullable List<AdSegment> manual) {
+        return merge(detected, null, chapter, manual);
+    }
+
+    /** Convenience overload with transcript segments; any argument may be null or empty. */
+    @NonNull
+    public static List<AdSegment> merge(@Nullable List<AdSegment> detected,
+                                        @Nullable List<AdSegment> transcript,
+                                        @Nullable List<AdSegment> chapter,
+                                        @Nullable List<AdSegment> manual) {
         List<AdSegment> all = new ArrayList<>();
         if (detected != null) {
             all.addAll(detected);
+        }
+        if (transcript != null) {
+            all.addAll(transcript);
         }
         if (chapter != null) {
             all.addAll(chapter);
@@ -66,7 +80,8 @@ public final class AdSegmentMerger {
         List<AdSegment> accepted = new ArrayList<>();
         // Highest rank first, so everything already accepted outranks what comes next.
         for (AdSegment.Source source : new AdSegment.Source[]{
-                AdSegment.Source.MANUAL, AdSegment.Source.CHAPTER, AdSegment.Source.DETECTED}) {
+                AdSegment.Source.MANUAL, AdSegment.Source.CHAPTER, AdSegment.Source.TRANSCRIPT,
+                AdSegment.Source.DETECTED, AdSegment.Source.SELF_PROMO}) {
             List<AdSegment> tier = unionWithinSource(segments, source);
             for (AdSegment segment : tier) {
                 accepted.addAll(subtract(segment, accepted));

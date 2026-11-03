@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The key field of the Claude API key dialog in Settings > Ad skipping; the explanation is the
+     dialog's message. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="8dp">
+
+    <dev.russell.yagi.common.views.AccentTextInputLayout
+        android:id="@+id/claudeKeyLayout"
+        style="?attr/textInputOutlinedDenseStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/claude_api_key_hint"
+        app:endIconMode="password_toggle"
+        app:hintEnabled="true">
+
+        <dev.russell.yagi.common.views.CursorAccentTextInputEditText
+            android:id="@+id/claudeKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:importantForAutofill="no"
+            android:inputType="textPassword"
+            android:maxLines="1" />
+    </dev.russell.yagi.common.views.AccentTextInputLayout>
+
+</LinearLayout>

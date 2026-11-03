@@ -81,6 +81,10 @@ from each edge on a 1.5 s average fixed a 766 s total overrun.
 
 ## Result with the shipped defaults
 
+(Before the filled-floor cue below. With it, which is what ships, medium sensitivity gives 19/23
+breaks, 9 false segments and 12.7 non-ad minutes; that is the audio baseline in the transcript
+section at the end.)
+
 | sensitivity | threshold | breaks hit | ad time covered | false segments | non-ad time skipped |
 |---|---|---|---|---|---|
 | high | 0.45 | 19 / 23 | 71% | 20 | 16.8 min / 12.6 h |
@@ -122,3 +126,101 @@ downloaded episodes), but it is small: `Extract` (stdin PCM to frames), `Frames`
 `Bench` (scoring) and `Series` (print bed score over a time range). Recreate it from this
 description, keep the sponsor-chapter episodes as ground truth, and treat the table above as the
 baseline any change has to beat on both the hit count at 0.60 and the non-ad minutes.
+
+## Transcripts and Claude (2026-11)
+
+The audio detector cannot hear a host read without a bed (ATP), and theme music is its main false
+positive. Both are easy to tell apart in words. So the episode's published transcript
+(`<podcast:transcript>`, timed formats only) is now read for ads too, in one of two ways:
+
+- **On the phone** (`TranscriptAdHeuristic`): phrase scoring. Each strong call to action (a web
+  address with a path, an offer code, "terms apply") and each sponsor transition ("brought to
+  you by", "after this message from") anchors a read; the read reaches back and forward through
+  lines that name the advertiser (names come from the web addresses it gives) and ends at a "back
+  to the show" right after the last call. A "Sponsor" speaker tag (Transistor's VTT has them) is an
+  ad outright. Reads that point at the show itself become `SELF_PROMO`.
+- **By Claude Haiku 5.5** (`ClaudeAdPrompt`, `ClaudeAdClient`), only with the user's own Anthropic
+  API key. One Messages API call per transcript with structured output: for each ad, the line it
+  starts and ends on plus its first and last few words, which place the edge inside long cues.
+  `certain` gives 0.9, `likely` 0.65, `self_promotion` a `SELF_PROMO` segment.
+
+`TranscriptAdFusion` then weighs the audio against the reading: a transcript ad keeps its own
+(word) edges and is boosted when the audio agrees; an audio detection inside the transcript's span
+(plus 30 s of theme music either side) that no transcript ad supports is multiplied by 0.3 after
+Claude (below every threshold) and by 0.85 after the phone's reading; audio outside the span (an
+ad stitched in after the transcript was made) is left alone. Merge ranking is MANUAL > CHAPTER >
+TRANSCRIPT > DETECTED > SELF_PROMO.
+
+### Data
+
+1. **The 2026-09 episodes, transcribed with vosk** (`vosk-model-small-en-us-0.15`, word timestamps,
+   one cue per utterance). Only Practical AI's feed transcript is usable for these shows (the
+   Changelog's HTML transcripts have no times and leave the sponsor reads out), so vosk stands in
+   for the machine transcripts hosts publish. It is much worse than those: no punctuation, numbers
+   spelt out, brand names garbled. That makes it a conservative test, and it was held out: nothing
+   was tuned on it. The labels were then *adjudicated*: the "negative" episodes (Syntax, MPU, Talk
+   Python, Upgrade, LINUX Unplugged, Distractible) turned out to carry sponsor reads nobody had
+   labelled, which counted against the transcript methods as false positives. Every unmatched
+   candidate of every method was read in the transcript and labelled ad or neutral (own
+   membership/book pitches, charity drives, outro credits), and the transcripts were searched for
+   reads no method found (Upgrade's Fitbod read). LINUX Unplugged's "Intro" chapter is a Scribe
+   pre-roll. That gives 37 breaks over 15 episodes.
+2. **Real feed transcripts with sponsor chapters**: 17 episodes from Practical AI, Build Your SaaS,
+   THE Bitcoin Podcast, School of Podcasting and Buzzcast (timed VTT/SRT as served), 21 breaks.
+   Two chapters were corrected against the text (a Framer chapter that ran 114 s past the read, a
+   ProfitWell chapter that ended 14 s early). Practical AI tags its reads `<v Sponsor>`, so it was
+   scored with speaker tags stripped as well as with them. The heuristic was tuned on this set.
+   Buzzsprout's inserted ads are not in its transcripts; those episodes were left out.
+
+### Results at the three thresholds (breaks hit, false segments, non-ad minutes skipped)
+
+Adjudicated vosk set, 37 breaks, 15 episodes:
+
+| method | 0.45 | 0.60 (default) | 0.75 |
+|---|---|---|---|
+| audio only | 22, 39, 31.8 min | 21, 13, 14.7 min | 19, 1, 8.7 min |
+| audio + phone reading | 30, 28, 25.3 min | 26, 4, 10.6 min | 18, 0, 4.3 min |
+| audio + Claude | 37, 2, 5.0 min | **37, 2, 5.0 min** | 36, 0, 0.4 min |
+
+Original labels (23 breaks): audio 19 / 9 / 12.7 min at 0.60; audio + Claude 23 / 3 / 2.3 min;
+the overrun into content around the breaks drops from 174 s to 11 s.
+
+Real feed transcripts, speaker tags stripped, 21 breaks:
+
+| method | 0.45 | 0.60 (default) | 0.75 |
+|---|---|---|---|
+| audio only | 14, 36, 29.0 min | 12, 30, 23.9 min | 11, 15, 15.7 min |
+| phone reading alone | 17, 15, 14.0 min | 17, 10, 11.0 min | 8, 10, 10.2 min |
+| audio + phone reading | 20, 42, 35.0 min | 19, 21, 22.2 min | 14, 15, 17.8 min |
+| audio + Claude | 20, 12, 4.4 min | **20, 12, 4.4 min** | 20, 8, 2.2 min |
+
+With the published speaker tags the phone reading alone gets 19 of 21. Claude's one miss is the
+School of Podcasting episode whose transcript has a gap where the ad is. Most of its "false"
+segments on this set are real but unlabelled: Practical AI's outro credit ("thanks to our
+partner Prediction Guard, predictionguard.com") and Build Your SaaS pre-rolls that have no
+chapter.
+
+### Choices the measurements made
+
+- **Effort `medium`** (Haiku's default) over `low`: on the vosk set 25/25 against 24/25 with
+  fewer "likely" guesses on garbled text; equal on real transcripts.
+- **Cost**: 15k input and 1k output tokens for a 45-minute episode, 45k and 2k for two hours, so
+  about a third of a US cent per hour of audio at Haiku 5.5 prices; a reply takes 5 to 10 s.
+- **Unsupported-audio factor**: 0.3 after Claude (any higher only added false segments), 0.85
+  after the phone's reading (0.75 lost breaks on the vosk set, 0.95 kept more false segments).
+- **The phone reading needs a decent transcript.** On vosk text it finds 13 of 37 alone, against
+  17 of 21 on real machine transcripts; its value is in fusion, where it removes most of the audio
+  detector's false segments.
+- A transcript whose last words end more than 15 s after the audio, or more than 4 minutes before
+  it, is not read (`TranscriptLines.fitsEpisode`): its times belong to another cut of the file.
+  Ads stitched in after transcription (Buzzsprout, Megaphone) still shift everything after them,
+  and nothing here detects that.
+
+### Re-running it
+
+`TxBench` extends the audio bench: a manifest line per episode (truth, frames, transcript, MIME
+type, podcast title, website host), knobs as `-D` properties (`-Dc.unsup`, `-Dh.unsup`,
+`-Deffort`, `-DstripSpeakers=true`), Claude replies cached per episode and effort so re-scoring is
+free, `-Dclaude=true -Dkeyfile=...` to fill the cache. It compiles the module sources plus Gson,
+OkHttp, okio, kotlin-stdlib, jsoup, org.json and androidx.annotation with plain `javac`, and
+stubs `android.util.Log`.

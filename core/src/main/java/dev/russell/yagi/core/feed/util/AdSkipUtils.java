@@ -46,13 +46,32 @@ public final class AdSkipUtils {
     }
 
     /**
-     * Whether a segment is confident enough to count as an ad. Only detected segments are
-     * guesses and need {@code minConfidence}; chapter and manual ones are exact and always count.
-     * Whether the segment is enabled does not matter here.
+     * Whether a segment is confident enough to count as an ad. Detected and transcript segments
+     * are guesses and need {@code minConfidence}; chapter and manual ones are exact and always
+     * count. The show's own promotions count only when the user chose to skip them
+     * ({@link Prefs#isAdSkipSelfPromo()}), and then like any other guess. Whether the segment is
+     * enabled does not matter here.
      */
     public static boolean meetsThreshold(@NonNull AdSegment segment, float minConfidence) {
-        return segment.getSource() != AdSegment.Source.DETECTED
-                || segment.getConfidence() >= minConfidence;
+        boolean skipSelfPromo = segment.getSource() == AdSegment.Source.SELF_PROMO
+                && Prefs.isAdSkipSelfPromo();
+        return meetsThreshold(segment, minConfidence, skipSelfPromo);
+    }
+
+    /** {@link #meetsThreshold(AdSegment, float)} with the self-promotion setting passed in. */
+    public static boolean meetsThreshold(@NonNull AdSegment segment, float minConfidence,
+                                         boolean skipSelfPromo) {
+        switch (segment.getSource()) {
+            case CHAPTER:
+            case MANUAL:
+                return true;
+            case SELF_PROMO:
+                return skipSelfPromo && segment.getConfidence() >= minConfidence;
+            case DETECTED:
+            case TRANSCRIPT:
+            default:
+                return segment.getConfidence() >= minConfidence;
+        }
     }
 
     /**

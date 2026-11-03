@@ -43,6 +43,7 @@ public class PreferencesBackupTest {
 
     private static final String UI_FILE = "SwipeActionsPrefs";
     private static final String SYNC_FILE = "gpodder.net";
+    private static final String CLAUDE_KEY_FILE = "anthropic";
 
     private Application context;
     private File backup;
@@ -51,6 +52,7 @@ public class PreferencesBackupTest {
     public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         defaults().edit().clear().commit();
+        prefs(CLAUDE_KEY_FILE).edit().clear().commit();
         Prefs.resetForTests();
         Prefs.init(context);
         PlaybackPreferences.init(context);
@@ -84,6 +86,7 @@ public class PreferencesBackupTest {
                 .commit();
         prefs(UI_FILE).edit().putString("swipe", "exported").commit();
         prefs(SYNC_FILE).edit().putString("username", "exported user").commit();
+        Prefs.setClaudeApiKey("exported key");
 
         try (FileOutputStream out = new FileOutputStream(backup)) {
             DatabaseExporter.exportToStream(out, context);
@@ -99,6 +102,7 @@ public class PreferencesBackupTest {
                 .commit();
         prefs(UI_FILE).edit().putString("swipe", "changed").commit();
         prefs(SYNC_FILE).edit().putString("username", "device user").commit();
+        Prefs.setClaudeApiKey("device key");
 
         DatabaseExporter.importBackup(Uri.fromFile(backup), context);
         assertEquals("nothing changes before the restart", "changed",
@@ -116,6 +120,7 @@ public class PreferencesBackupTest {
         assertEquals("device secret", defaults().getString(Prefs.PREF_PROXY_PASSWORD, null));
         assertEquals("exported", prefs(UI_FILE).getString("swipe", null));
         assertEquals("device user", prefs(SYNC_FILE).getString("username", null));
+        assertEquals("device key", Prefs.getClaudeApiKey());
 
         SQLiteDatabase imported = SQLiteDatabase.openDatabase(
                 context.getDatabasePath(Db.DATABASE_NAME).getPath(), null, SQLiteDatabase.OPEN_READONLY);
@@ -157,6 +162,7 @@ public class PreferencesBackupTest {
             assertEquals(1, countRows(db, "file = ? AND key = ?", PreferencesBackup.DEFAULT_FILE, "pref_string"));
             assertEquals(1, countRows(db, "file = ?", UI_FILE));
             assertEquals(0, countRows(db, "file = ?", SYNC_FILE));
+            assertEquals(0, countRows(db, "file = ?", CLAUDE_KEY_FILE));
             assertEquals(0, countRows(db, "key = ?", Prefs.PREF_PROXY_PASSWORD));
         } finally {
             db.close();

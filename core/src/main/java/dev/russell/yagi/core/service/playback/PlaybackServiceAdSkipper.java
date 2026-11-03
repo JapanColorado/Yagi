@@ -318,7 +318,7 @@ class PlaybackServiceAdSkipper {
             if (!segment.contains(positionMs)) {
                 continue;
             }
-            // Only detected segments are guesses; chapter and manual ones are exact.
+            // Detected and transcript segments are guesses; chapter and manual ones are exact.
             if (!AdSkipUtils.meetsThreshold(segment, minConfidence)) {
                 continue;
             }

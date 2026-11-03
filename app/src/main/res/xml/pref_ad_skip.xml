@@ -20,6 +20,26 @@
     <dev.russell.yagi.common.common.prefs.supportv7.ATESwitchPreference
         android:layout="@layout/list_item_view_switch"
         android:defaultValue="true"
+        android:key="pref_ad_skip_use_transcripts"
+        android:summary="@string/pref_ad_skip_use_transcripts_sum"
+        android:title="@string/pref_ad_skip_use_transcripts_title" />
+    <dev.russell.yagi.common.common.prefs.supportv7.ATEPreference
+        android:layout="@layout/list_item_view"
+        android:dependency="pref_ad_skip_use_transcripts"
+        android:key="pref_ad_skip_claude_key"
+        android:persistent="false"
+        android:summary="@string/pref_ad_skip_claude_key_sum_unset"
+        android:title="@string/pref_ad_skip_claude_key_title" />
+    <dev.russell.yagi.common.common.prefs.supportv7.ATESwitchPreference
+        android:layout="@layout/list_item_view_switch"
+        android:defaultValue="false"
+        android:dependency="pref_ad_skip_use_transcripts"
+        android:key="pref_ad_skip_self_promo"
+        android:summary="@string/pref_ad_skip_self_promo_sum"
+        android:title="@string/pref_ad_skip_self_promo_title" />
+    <dev.russell.yagi.common.common.prefs.supportv7.ATESwitchPreference
+        android:layout="@layout/list_item_view_switch"
+        android:defaultValue="true"
         android:key="pref_ad_skip_analyze_on_download"
         android:summary="@string/pref_ad_skip_analyze_on_download_sum"
         android:title="@string/pref_ad_skip_analyze_on_download_title" />

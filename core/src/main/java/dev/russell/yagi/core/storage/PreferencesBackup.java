@@ -70,11 +70,12 @@ public final class PreferencesBackup {
      * Preference files that are not exported, and are left alone on restore: the sync login and
      * sync state ({@code SynchronizationCredentials}, {@code SynchronizationSettings} and
      * {@code SynchronizationQueueStorage}), the version marker of {@code PreferenceUpgrader}, the
-     * settings search history, usage counters and the last refresh time.
+     * settings search history, usage counters, the last refresh time and the user's Anthropic API
+     * key ({@code anthropic}, see {@code AdSkipPrefs}), which must never end up in an export file.
      */
     private static final Set<String> EXCLUDED_FILES = new HashSet<>(Arrays.asList(
             "gpodder.net", "synchronization", "app_version", "preferenceSearch",
-            "UsageStatistics", "dbtasks"));
+            "UsageStatistics", "dbtasks", "anthropic"));
 
     /** Files written by libraries (WebView, AndroidX, ...) rather than by the app. */
     private static final List<String> EXCLUDED_FILE_PREFIXES = Arrays.asList(

@@ -1,5 +1,7 @@
 package dev.russell.yagi.core.pref
 
+import android.content.Context
+import android.content.SharedPreferences
 import dev.russell.yagi.core.pref.PrefsStore.getString
 import dev.russell.yagi.core.pref.PrefsStore.prefs
 
@@ -13,8 +15,17 @@ import dev.russell.yagi.core.pref.PrefsStore.prefs
  * The feature is opt-in ([isAdSkipEnabled] defaults to false) because detection is heuristic.
  * The threshold only ever gates [dev.russell.yagi.model.feed.AdSegment.Source.DETECTED]
  * segments: chapter-derived and hand-marked ones are exact and always skip.
+ *
+ * The user's Anthropic API key (for transcript analysis by Claude) is kept in its own
+ * [SharedPreferences] file, [CLAUDE_KEY_FILE], so that the settings backup and Android Auto
+ * Backup can leave exactly that file out.
  */
 internal object AdSkipPrefs {
+
+    /** Name of the SharedPreferences file that holds only the Anthropic API key. */
+    const val CLAUDE_KEY_FILE = "anthropic"
+
+    private const val CLAUDE_KEY = "api_key"
 
     /** Require a very sure detection: only segments at 0.75 confidence or above are skipped. */
     const val SENSITIVITY_LOW = "low"
@@ -86,5 +97,71 @@ internal object AdSkipPrefs {
         val updated = HashSet(current)
         updated.add(mediaId.toString())
         prefs.edit().putStringSet(Prefs.PREF_AD_SKIP_ANALYZED_MEDIA, updated).apply()
+    }
+
+    /** Whether transcripts (when a podcast publishes one) are searched for sponsor reads. */
+    var isAdSkipUseTranscripts: Boolean
+        get() = prefs.getBoolean(Prefs.PREF_AD_SKIP_USE_TRANSCRIPTS, true)
+        set(use) {
+            prefs.edit().putBoolean(Prefs.PREF_AD_SKIP_USE_TRANSCRIPTS, use).apply()
+        }
+
+    /**
+     * Whether the show's promotions of itself (memberships, merchandise, newsletters) are
+     * skipped too. Off by default: unlike third-party ads, many listeners want to hear them.
+     */
+    var isAdSkipSelfPromo: Boolean
+        get() = prefs.getBoolean(Prefs.PREF_AD_SKIP_SELF_PROMO, false)
+        set(skip) {
+            prefs.edit().putBoolean(Prefs.PREF_AD_SKIP_SELF_PROMO, skip).apply()
+        }
+
+    private val claudeKeyPrefs: SharedPreferences
+        get() = PrefsStore.context.getSharedPreferences(CLAUDE_KEY_FILE, Context.MODE_PRIVATE)
+
+    /** The stored Anthropic API key, trimmed, or null when none (or only blanks) is stored. */
+    fun getClaudeApiKey(): String? =
+        claudeKeyPrefs.getString(CLAUDE_KEY, null)?.trim()?.takeIf { it.isNotEmpty() }
+
+    /** Stores the Anthropic API key (trimmed); null or blank removes it. */
+    fun setClaudeApiKey(key: String?) {
+        val trimmed = key?.trim()
+        val editor = claudeKeyPrefs.edit()
+        if (trimmed.isNullOrEmpty()) {
+            editor.remove(CLAUDE_KEY)
+        } else {
+            editor.putString(CLAUDE_KEY, trimmed)
+        }
+        editor.apply()
+    }
+
+    fun hasClaudeApiKey(): Boolean = getClaudeApiKey() != null
+
+    /**
+     * How the transcript of a media id was last analysed for ads (the method string is the
+     * caller's, e.g. which detector ran), or null when it never was. Entries are stored as
+     * `"<mediaId>:<method>"` in one string set.
+     */
+    fun getTranscriptAdMethod(mediaId: Long): String? {
+        val prefix = "$mediaId:"
+        return prefs.getStringSet(Prefs.PREF_AD_SKIP_TRANSCRIPT_ANALYZED, emptySet())
+            ?.firstOrNull { it.startsWith(prefix) }
+            ?.substring(prefix.length)
+    }
+
+    /** Records how the transcript of a media id was analysed, replacing any earlier entry. */
+    fun setTranscriptAdMethod(mediaId: Long, method: String) {
+        val prefix = "$mediaId:"
+        val entry = prefix + method
+        val current = prefs.getStringSet(Prefs.PREF_AD_SKIP_TRANSCRIPT_ANALYZED, emptySet())
+            ?: emptySet()
+        if (entry in current && current.count { it.startsWith(prefix) } == 1) {
+            return
+        }
+        // getStringSet's result must never be mutated; write a fresh copy.
+        val updated = HashSet<String>(current.size + 1)
+        current.filterTo(updated) { !it.startsWith(prefix) }
+        updated.add(entry)
+        prefs.edit().putStringSet(Prefs.PREF_AD_SKIP_TRANSCRIPT_ANALYZED, updated).apply()
     }
 }

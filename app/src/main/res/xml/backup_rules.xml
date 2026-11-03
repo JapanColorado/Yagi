@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Full backup (Auto Backup, adb backup) up to Android 11. Everything is backed up as before
+     except the user's Anthropic API key, which lives alone in anthropic.xml (see AdSkipPrefs).
+     Android 12 and later read data_extraction_rules.xml instead. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="anthropic.xml" />
+</full-backup-content>

@@ -167,6 +167,62 @@ public class AdSkipUtilsTest {
     }
 
     @Test
+    public void transcriptAndDetectedSegmentsAreGatedByConfidence() {
+        for (AdSegment.Source source : new AdSegment.Source[]{
+                AdSegment.Source.TRANSCRIPT, AdSegment.Source.DETECTED}) {
+            for (boolean skipSelfPromo : new boolean[]{false, true}) {
+                assertTrue(source.name(), AdSkipUtils.meetsThreshold(
+                        segment(source, 0.60f), 0.60f, skipSelfPromo));
+                assertFalse(source.name(), AdSkipUtils.meetsThreshold(
+                        segment(source, 0.59f), 0.60f, skipSelfPromo));
+            }
+        }
+    }
+
+    @Test
+    public void chapterAndManualSegmentsAlwaysCount() {
+        for (AdSegment.Source source : new AdSegment.Source[]{
+                AdSegment.Source.CHAPTER, AdSegment.Source.MANUAL}) {
+            for (boolean skipSelfPromo : new boolean[]{false, true}) {
+                assertTrue(source.name(), AdSkipUtils.meetsThreshold(
+                        segment(source, 0f), 0.95f, skipSelfPromo));
+            }
+        }
+    }
+
+    @Test
+    public void selfPromotionCountsOnlyWhenAskedForAndConfident() {
+        assertFalse(AdSkipUtils.meetsThreshold(segment(AdSegment.Source.SELF_PROMO, 1f), 0.6f,
+                false));
+        assertTrue(AdSkipUtils.meetsThreshold(segment(AdSegment.Source.SELF_PROMO, 0.6f), 0.6f,
+                true));
+        assertFalse(AdSkipUtils.meetsThreshold(segment(AdSegment.Source.SELF_PROMO, 0.59f), 0.6f,
+                true));
+    }
+
+    @Test
+    public void theTwoArgumentThresholdReadsTheSelfPromoSetting() {
+        AdSegment promo = segment(AdSegment.Source.SELF_PROMO, 0.9f);
+        AdSegment transcript = segment(AdSegment.Source.TRANSCRIPT, 0.9f);
+        Prefs.setAdSkipSensitivity(AdSkipPrefs.SENSITIVITY_MEDIUM);
+
+        Prefs.setAdSkipSelfPromo(false);
+        assertFalse(AdSkipUtils.meetsThreshold(promo, 0.6f));
+        assertTrue(AdSkipUtils.meetsThreshold(transcript, 0.6f));
+        assertEquals(Arrays.asList(transcript),
+                AdSkipUtils.segmentsMeetingThreshold(Arrays.asList(promo, transcript)));
+
+        Prefs.setAdSkipSelfPromo(true);
+        assertTrue(AdSkipUtils.meetsThreshold(promo, 0.6f));
+        assertEquals(Arrays.asList(promo, transcript),
+                AdSkipUtils.segmentsMeetingThreshold(Arrays.asList(promo, transcript)));
+    }
+
+    private static AdSegment segment(AdSegment.Source source, float confidence) {
+        return new AdSegment(1, 0, 1000, source, confidence);
+    }
+
+    @Test
     public void segmentsMeetingThresholdFollowsTheSensitivity() {
         AdSegment weak = detected(0.50f);
         AdSegment strong = detected(0.80f);

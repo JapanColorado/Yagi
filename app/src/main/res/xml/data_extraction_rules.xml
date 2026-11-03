@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backup and device-to-device transfer on Android 12 and later. Everything is included as
+     before except the user's Anthropic API key, which lives alone in anthropic.xml (see
+     AdSkipPrefs). backup_rules.xml holds the same rule for older versions. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="anthropic.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="anthropic.xml" />
+    </device-transfer>
+</data-extraction-rules>

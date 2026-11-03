@@ -42,6 +42,7 @@ public class PrefsTest {
     public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         PreferenceManager.getDefaultSharedPreferences(context).edit().clear().commit();
+        claudeKeyPrefs().edit().clear().commit();
         Prefs.resetForTests();
         Prefs.init(context);
     }
@@ -221,6 +222,58 @@ public class PrefsTest {
     }
 
     @Test
+    public void transcriptAdSkipSettingsDefaultAndRoundTrip() {
+        assertTrue(Prefs.isAdSkipUseTranscripts());
+        assertFalse(Prefs.isAdSkipSelfPromo());
+        Prefs.setAdSkipUseTranscripts(false);
+        Prefs.setAdSkipSelfPromo(true);
+        assertFalse(Prefs.isAdSkipUseTranscripts());
+        assertTrue(Prefs.isAdSkipSelfPromo());
+        // what the Settings switches store
+        assertFalse(prefs().getBoolean(Prefs.PREF_AD_SKIP_USE_TRANSCRIPTS, true));
+        assertTrue(prefs().getBoolean(Prefs.PREF_AD_SKIP_SELF_PROMO, false));
+    }
+
+    @Test
+    public void theClaudeKeyIsTrimmedAndKeptOutOfTheDefaultPreferences() {
+        assertNull(Prefs.getClaudeApiKey());
+        assertFalse(Prefs.hasClaudeApiKey());
+
+        Prefs.setClaudeApiKey("  sk-ant-test  ");
+        assertEquals("sk-ant-test", Prefs.getClaudeApiKey());
+        assertTrue(Prefs.hasClaudeApiKey());
+        assertEquals("sk-ant-test", claudeKeyPrefs().getString("api_key", null));
+        assertFalse(prefs().getAll().containsValue("sk-ant-test"));
+
+        Prefs.setClaudeApiKey("   ");
+        assertNull(Prefs.getClaudeApiKey());
+        assertFalse(claudeKeyPrefs().contains("api_key"));
+
+        Prefs.setClaudeApiKey("sk-ant-test");
+        Prefs.setClaudeApiKey(null);
+        assertFalse(Prefs.hasClaudeApiKey());
+
+        // a blank value written by something else still reads as unset
+        claudeKeyPrefs().edit().putString("api_key", " ").commit();
+        assertNull(Prefs.getClaudeApiKey());
+    }
+
+    @Test
+    public void transcriptAdMethodIsRememberedPerMediaAndReplaced() {
+        assertNull(Prefs.getTranscriptAdMethod(7));
+        Prefs.setTranscriptAdMethod(7, "phrases");
+        Prefs.setTranscriptAdMethod(77, "claude");
+        assertEquals("phrases", Prefs.getTranscriptAdMethod(7));
+        assertEquals("claude", Prefs.getTranscriptAdMethod(77));
+
+        Prefs.setTranscriptAdMethod(7, "claude");
+        assertEquals("claude", Prefs.getTranscriptAdMethod(7));
+        assertEquals("claude", Prefs.getTranscriptAdMethod(77));
+        assertEquals(2, prefs().getStringSet(Prefs.PREF_AD_SKIP_TRANSCRIPT_ANALYZED, null).size());
+        assertNull(Prefs.getTranscriptAdMethod(777));
+    }
+
+    @Test
     public void enqueueLocationRoundTrips() {
         Prefs.setEnqueueLocation(Prefs.EnqueueLocation.FRONT);
         assertEquals(Prefs.EnqueueLocation.FRONT, Prefs.getEnqueueLocation());
@@ -383,5 +436,9 @@ public class PrefsTest {
 
     private SharedPreferences prefs() {
         return PreferenceManager.getDefaultSharedPreferences(context);
+    }
+
+    private SharedPreferences claudeKeyPrefs() {
+        return context.getSharedPreferences("anthropic", android.content.Context.MODE_PRIVATE);
     }
 }
