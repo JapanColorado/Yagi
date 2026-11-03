@@ -46,6 +46,8 @@ Yagi is licensed under the GNU General Public License (GPL-3.0). You can find th
 
 ## Building
 
+Every push to `main` that passes CI publishes a signed APK on the [Releases page](https://github.com/JapanColorado/Yagi/releases). To install it and get updates automatically, add `https://github.com/JapanColorado/Yagi` as a GitHub source in [Obtainium](https://github.com/ImranR98/Obtainium).
+
 The build is driven by [pixi](https://pixi.sh), which provides JDK 25. You need an Android SDK with platform 37 and build-tools 36.0.0 (default location `~/Android/Sdk`, override with `ANDROID_HOME`). There are no git submodules and no build flavors.
 
 ```bash

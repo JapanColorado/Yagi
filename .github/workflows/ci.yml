@@ -1,0 +1,111 @@
+# Every push to main that passes the checks publishes a signed APK as a GitHub release, which
+# Obtainium on the phone installs as an update. PRs and docs-only pushes just run the checks.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'fastlane/**', '.claude/**', 'LICENSE']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**', 'fastlane/**', '.claude/**', 'LICENSE']
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Never cancel a main run halfway through publishing a release.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  APP: yagi
+  # SHA-256 of the signing certificate on the installed app. A mismatch means the phone
+  # would reject the update, so the release step refuses to publish.
+  EXPECTED_CERT_SHA256: c4d32bc07c3d7b0c72ead8f9c08e197f618381175e900a6e976935a4e44a87f7
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # versionCode is the commit count
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: android-actions/setup-android@v4
+        with:
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Checks
+        run: ./gradlew testDebugUnitTest lint detekt --continue
+      - name: '!! budget'
+        run: bash scripts/count-bangbang.sh
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            **/build/reports/
+          if-no-files-found: ignore
+
+      - name: Write signing config
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          PODCASTINDEX_API_KEY: ${{ secrets.PODCASTINDEX_API_KEY }}
+          PODCASTINDEX_API_SECRET: ${{ secrets.PODCASTINDEX_API_SECRET }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Signing secrets are missing; refusing to publish an APK the phone can't update to"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > app/release.jks
+          {
+            echo "storeFile=./release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "podcastindexApiKey=$PODCASTINDEX_API_KEY"
+            echo "podcastindexApiSecret=$PODCASTINDEX_API_SECRET"
+          } > secrets.properties
+
+      - name: Build release APK
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: ./gradlew assembleRelease
+
+      - name: Publish release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Newest build-tools that actually ships apksigner (preview dirs may not).
+          bt="$(for d in $(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V); do [ -x "$d/apksigner" ] && echo "${d%/}"; done | tail -n1)"
+          apk="app/build/outputs/apk/release/app-release.apk"
+          echo "build-tools: $bt, APK: $apk"
+          certs="$("$bt/apksigner" verify --print-certs "$apk" 2>&1)" || { echo "$certs"; exit 1; }
+          echo "$certs" | grep -v '^WARNING'
+          # Output format varies by build-tools ("Signer #1 certificate ..." vs "V2 Signer: certificate ...");
+          # every signer listed must be the expected one.
+          digest="$(grep -oE 'certificate SHA-256 digest: [0-9a-f]{64}' <<<"$certs" | awk '{print $NF}' | sort -u)"
+          if [ "$digest" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::APK is signed with $digest, expected $EXPECTED_CERT_SHA256"
+            exit 1
+          fi
+          version="$("$bt/aapt2" dump badging "$apk" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p")"
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; nothing to publish"
+            exit 0
+          fi
+          out="$RUNNER_TEMP/$APP-$version.apk"
+          cp "$apk" "$out"
+          gh release create "$tag" "$out" --target "$GITHUB_SHA" --title "$APP $version" --generate-notes
+          echo "Published $tag" >> "$GITHUB_STEP_SUMMARY"

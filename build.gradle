@@ -38,6 +38,16 @@ allprojects {
 }
 
 
+// Commit count of HEAD (CI checks out full history, so local and CI builds agree); 1 outside git.
+def gitCommitCount = {
+    try {
+        return providers.exec { commandLine 'git', 'rev-list', '--count', 'HEAD' }
+                .standardOutput.asText.get().trim().toInteger()
+    } catch (Exception ignored) {
+        return 1
+    }
+}()
+
 project.ext {
     //app info
     applicationId = "dev.russell.yagi"
@@ -46,8 +56,10 @@ project.ext {
     // The current AndroidX releases need 23, WorkManager 2.12 needs 24.
     minSdkVersion = 24
     targetSdkVersion = 35
-    versionCode = 79
-    versionName = "2.8.5.20250928"
+    // Every push to main publishes a release (.github/workflows/ci.yml), so the version tracks the
+    // commit count (already past upstream's last versionCode, 79). Bump the base name by hand.
+    versionCode = gitCommitCount
+    versionName = "2.8.5.20250928.$gitCommitCount"
 
     // AndroidX
     annotationVersion = "1.11.0"

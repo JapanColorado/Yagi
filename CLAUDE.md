@@ -53,6 +53,10 @@ pixi run clean
 
 JVM unit tests exist in `parser/feed`, `playback/base`, and `core` (`core/src/test`). Every module with Robolectric (4.17) tests has `src/test/resources/robolectric.properties` pinning `sdk=35`, the targetSdk. Robolectric older than 4.13 cannot read JDK 25 class files. Prefer plain JUnit4 for pure logic; use `@RunWith(RobolectricTestRunner.class)` when the code under test needs real Android classes (SQLite, `TextUtils`, resources).
 
+## Releases
+
+Every push to `main` that passes `.github/workflows/ci.yml` (the same checks as `pixi run check`) publishes a signed APK as a GitHub release tagged `v<versionName>`. Obtainium on the phone installs it. Pushes that touch only docs don't release. `versionCode` is the commit count and `versionName` is `<base>.<count>`: bump the base in the root `build.gradle` by hand, never hard-code `versionCode`, and never rewrite `main`'s history. CI signs with the keystore in the repo secrets, which must stay the key the installed app was signed with (the workflow's `EXPECTED_CERT_SHA256` enforces this). The shared change → emulator → push loop is in `~/Projects/Android-Apps/CLAUDE.md`.
+
 ## Module architecture
 
 `settings.gradle` includes 18 modules: 15 app modules plus the three vendored libraries under `lib/`. Every module applies `common.gradle`, which supplies the legacy-kapt and parcelize plugins, Java 17, viewBinding and the shared `packaging`/`lint` blocks. The root `build.gradle` copies `project.ext` into every module, because Gradle 9 deprecates reading parent-project properties by bare name. All shared versions (SDK levels, `versionCode`/`versionName`, library versions) live in `project.ext` in the root `build.gradle`.
