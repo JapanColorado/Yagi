@@ -13,6 +13,7 @@ import dev.russell.yagi.event.FeedItemEvent
 import dev.russell.yagi.event.FeedListUpdateEvent
 import dev.russell.yagi.event.PlayerStatusEvent
 import dev.russell.yagi.event.UnreadItemsUpdateEvent
+import dev.russell.yagi.dialog.WatchedFoldersDialog
 import dev.russell.yagi.util.LocalFeedImporter
 import dev.russell.yagi.view.EmptyViewHandler
 import android.os.Bundle
@@ -70,6 +71,9 @@ class AudiobooksFragment : Fragment(), DoubleClickBackToContentTopListener.IBack
                 if (childFragmentManager.findFragmentByTag(AudiobookFilterSheet.TAG) == null) {
                     AudiobookFilterSheet().show(childFragmentManager, AudiobookFilterSheet.TAG)
                 }
+                true
+            } else if (item.itemId == R.id.audiobooks_watched_folders) {
+                WatchedFoldersDialog.show(requireContext())
                 true
             } else {
                 false

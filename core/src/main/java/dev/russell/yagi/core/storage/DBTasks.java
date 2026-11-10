@@ -13,6 +13,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 import androidx.documentfile.provider.DocumentFile;
 
+import dev.russell.yagi.core.feed.LocalFeedCreator;
 import dev.russell.yagi.core.util.StorageUtils;
 
 import dev.russell.yagi.core.service.download.DownloadRequest;
@@ -126,6 +127,8 @@ public final class DBTasks {
      */
     /** @return false if the refresh could not be started (see {@link DownloadService#refreshAllFeeds}). */
     public static boolean refreshAllFeeds(final Context context, boolean initiatedByUser) {
+        // first, so that books that appeared in a library folder are scanned by this refresh
+        LocalFeedCreator.rescanLibraries(context);
         if (!DownloadService.refreshAllFeeds(context, initiatedByUser)) {
             return false;
         }

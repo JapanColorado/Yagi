@@ -6,4 +6,8 @@
         android:icon="@drawable/ic_filter"
         android:title="@string/sort_and_filter"
         custom:showAsAction="always" />
+    <item
+        android:id="@+id/audiobooks_watched_folders"
+        android:title="@string/watched_folders"
+        custom:showAsAction="never" />
 </menu>

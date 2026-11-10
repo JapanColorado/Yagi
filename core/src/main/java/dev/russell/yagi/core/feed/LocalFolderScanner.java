@@ -14,7 +14,9 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import dev.russell.yagi.model.playback.MediaType;
 import dev.russell.yagi.parser.feed.util.MimeTypeUtils;
@@ -83,12 +85,36 @@ public final class LocalFolderScanner {
     public static final class Result {
         public final List<LocalFile> mediaFiles = new ArrayList<>();
         public final List<LocalFile> imageFiles = new ArrayList<>();
+        /**
+         * The document id of every folder that was walked, by its path below the scanned folder
+         * ("" for the scanned folder itself). {@link LocalFeedCreator} builds the URLs of the
+         * books inside a library folder from these.
+         */
+        public final Map<String, String> folderIds = new LinkedHashMap<>();
         /** True if a limit was hit, so the lists may be incomplete. */
         public boolean truncated;
     }
 
     /**
-     * Walks the tree below {@code treeUri} (as returned by the OpenDocumentTree picker).
+     * The id of the document a storage access framework URI points at: the folder below the
+     * picked tree for {@code .../tree/<picked>/document/<folder>} (a book inside a library
+     * folder), else the picked tree itself.
+     */
+    @NonNull
+    public static String documentIdOf(@NonNull Uri uri) {
+        List<String> segments = uri.getPathSegments();
+        if (segments.size() >= 4 && "document".equals(segments.get(2))) {
+            return segments.get(3);
+        }
+        if (segments.size() >= 2 && "document".equals(segments.get(0))) {
+            return segments.get(1);
+        }
+        return DocumentsContract.getTreeDocumentId(uri);
+    }
+
+    /**
+     * Walks the tree below {@code treeUri}: the tree URI the OpenDocumentTree picker returned, or
+     * the URI of a folder inside such a tree.
      *
      * @throws IOException if the picked folder itself cannot be listed
      */
@@ -97,7 +123,7 @@ public final class LocalFolderScanner {
         ContentResolver resolver = context.getContentResolver();
         Result result = new Result();
         Deque<Folder> pending = new ArrayDeque<>();
-        pending.push(new Folder(DocumentsContract.getTreeDocumentId(treeUri), "", 0));
+        pending.push(new Folder(documentIdOf(treeUri), "", 0));
         int folders = 0;
         boolean root = true;
         while (!pending.isEmpty()) {
@@ -108,6 +134,7 @@ public final class LocalFolderScanner {
             }
             Folder folder = pending.pop();
             folders++;
+            result.folderIds.put(folder.relativePath, folder.documentId);
             Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, folder.documentId);
             List<Folder> subfolders = new ArrayList<>();
             try (Cursor cursor = resolver.query(childrenUri, PROJECTION, null, null, null)) {

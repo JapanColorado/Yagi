@@ -740,7 +740,21 @@
     <string name="feed_audiobook_title">Audiobook</string>
     <string name="feed_audiobook_summary">Play tracks in order, keep out of Episodes and new-episode counts</string>
     <string name="no_audiobooks_head_label">No audiobooks</string>
-    <string name="no_audiobooks_label">Add an audiobook file (such as .m4b) or a folder of tracks from your device.</string>
+    <string name="no_audiobooks_label">Add a folder from your device: one audiobook, or a folder with all your audiobooks, which is split into its books.</string>
+    <plurals name="local_library_audiobooks_added">
+        <item quantity="one">%d audiobook added</item>
+        <item quantity="other">%d audiobooks added</item>
+    </plurals>
+    <plurals name="local_library_feeds_added">
+        <item quantity="one">%d folder added</item>
+        <item quantity="other">%d folders added</item>
+    </plurals>
+    <string name="local_library_nothing_new">Everything in this folder is already in your library</string>
+    <string name="watched_folders">Watched folders</string>
+    <string name="watched_folders_empty">No folders are watched. Add a folder that holds several audiobooks, and the books you copy into it later are added when the library refreshes.</string>
+    <string name="watched_folder_stop_title">Stop watching “%1$s”?</string>
+    <string name="watched_folder_stop_message">New books in this folder will no longer be added. The books already in your library stay.</string>
+    <string name="watched_folder_stop">Stop watching</string>
     <string name="audiobook_percent">%1$d%%</string>
     <string name="audiobook_time_left">%1$s left</string>
     <string name="audiobook_finished">Finished</string>
