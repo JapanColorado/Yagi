@@ -142,8 +142,13 @@ breaks across six shows: ad loudness, crest and flatness flip sign from show to 
 interview shows the guest deviates as much as any ad. Do not tune thresholds by hand; the harness
 that produced the defaults (ffmpeg-decoded real episodes with sponsor chapters as ground truth,
 run through the real extractor and detector on the JVM) is described in `docs/AD_SKIP_TUNING.md`.
-`ChapterAdMatcher` flags chapters titled like sponsor breaks, `AdSegmentMerger` gives manual > chapter
-> detected precedence, and `AdAnalyzer` is the facade. `AdAnalysisWorker` (WorkManager, unique per
+`ChapterAdMatcher` flags chapters titled like sponsor breaks (chapters come from the feed, the
+file, the Podcasting 2.0 chapter file, or, when none of those has any, the "00:00 Intro" list in the
+episode's description, read by the pure-Java `core/feed/DescriptionChapterParser`; description
+chapters are parsed when chapters load, not at feed refresh). Besides the worker, `PlaybackServiceAdSkipper.onChaptersLoaded`
+stores the chapter segments of whatever chapters the service loaded (only when they changed, keeping
+segments the user switched off), so streamed and previously analysed episodes skip labelled breaks too;
+`AdSegmentMerger` gives manual > chapter > detected precedence, and `AdAnalyzer` is the facade. `AdAnalysisWorker` (WorkManager, unique per
 media id) is enqueued from `MediaDownloadedHandler` after a download and from
 `PlaybackServiceAdSkipper` the first time a downloaded episode that was never analysed starts playing,
 or when ads get switched on (globally or for its feed) while such an episode is playing
@@ -152,8 +157,11 @@ and "never run" look the same in the table). It stores every result with confide
 `ad_segments` table (`AdSegmentDao`, added in DB version 4; version 5 replaced the old per-feed opt-out
 column `feed_ad_skip` with `feed_ad_skip_override`, mapping 1 to NULL and keeping 0); the sensitivity preference is applied at playback
 time, so changing it needs no re-analysis. `PlaybackServiceAdSkipper` runs on the service's one-second
-ticker next to the intro/ending skipper: it only skips when playback *entered* a segment within a 3 s
-window, treats a seek into the middle as "let it play", posts `AdSkippedEvent` (the app shows the Undo
+ticker next to the intro/ending skipper: it plays the first and last 3 s of every segment
+(`SKIP_BUFFER_MS`: the skip happens 3 s in and lands 3 s before the end, so boundaries that are a little
+off cost ad rather than show; segments too short to leave a 3 s jump just play), only skips when
+playback *entered* the segment within a 3 s window after that lead-in, treats a seek into the middle
+as "let it play", posts `AdSkippedEvent` (the app shows the Undo
 snackbar and answers with `AdSkipUndoEvent`), and never shows UI itself. The detector's honest limits:
 host-read ads with no music bed (ATP-style) are invisible to it, and intro/outro theme music and
 in-show music segments are the likely false positives, which is why segments are drawn on

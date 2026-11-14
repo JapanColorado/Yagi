@@ -8,12 +8,14 @@ import androidx.annotation.VisibleForTesting;
 
 import org.greenrobot.eventbus.EventBus;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import dev.russell.yagi.core.adskip.AdAnalysisWorker;
+import dev.russell.yagi.core.adskip.ChapterAdMatcher;
 import dev.russell.yagi.core.feed.util.AdSkipUtils;
 import dev.russell.yagi.core.pref.Prefs;
 import dev.russell.yagi.core.storage.DBReader;
@@ -24,6 +26,7 @@ import dev.russell.yagi.model.feed.FeedItem;
 import dev.russell.yagi.model.feed.FeedMedia;
 import dev.russell.yagi.model.feed.FeedPreferences;
 import dev.russell.yagi.model.playback.Playable;
+import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
@@ -36,11 +39,22 @@ import io.reactivex.schedulers.Schedulers;
  * playable changes or the stored segments change), the set of segments that must not be skipped
  * again during this playback, and the decision the one-second ticker asks it for every second.
  *
+ * <p>Skips leave a {@link #SKIP_BUFFER_MS} margin at both ends: the skip happens that far into
+ * the segment and lands that far before its end, so a boundary that is a few seconds off (a
+ * description timestamp, dynamically inserted ads, the detector's estimate) costs a little ad
+ * rather than a little show. A segment too short to leave {@link #MIN_SKIP_MS} between the two
+ * margins plays.
+ *
  * <p>Two rules keep the feature from fighting the listener. A segment is only skipped when
  * playback <em>ran into</em> it, that is within {@link #ENTRY_WINDOW_MS} (scaled by the playback
- * speed) of its start; seeking into the middle of a segment is taken as "I want to hear this" and
- * suppresses it instead. And a skipped segment is suppressed immediately, so undoing a skip
- * cannot be undone again by the next tick.
+ * speed) of the point where its skip is due; seeking into the middle of a segment is taken as
+ * "I want to hear this" and suppresses it instead. And a skipped segment is suppressed
+ * immediately, so undoing a skip cannot be undone again by the next tick.
+ *
+ * <p>It also keeps the episode's chapter ad segments in step with the chapters the service
+ * loaded (the feed's, the file's, the Podcasting 2.0 chapter file's or the description's), so
+ * labelled breaks are skipped in streamed episodes and episodes analysed before their chapters
+ * were known.
  *
  * <p>This class never shows UI. It posts {@link AdSkippedEvent} and the app layer decides whether
  * to show a snackbar with an Undo action.
@@ -49,18 +63,23 @@ class PlaybackServiceAdSkipper {
     private static final String TAG = "PlaybackService";
 
     /**
-     * How far past a segment's start playback may be and still count as having just entered it.
-     * Scaled by the playback speed because the ticker runs in wall-clock seconds while positions
-     * advance in media time.
+     * How far past the point where a segment's skip is due playback may be and still count as
+     * having just run into it. Scaled by the playback speed because the ticker runs in wall-clock
+     * seconds while positions advance in media time.
      */
     @VisibleForTesting
     static final long ENTRY_WINDOW_MS = 3000;
 
-    /** The detector's boundaries run about half a second long, so land just inside the end. */
-    private static final long END_NUDGE_MS = 500;
+    /**
+     * How much of each end of a segment is played: the skip happens this far into it and lands
+     * this far before its end. In media time.
+     */
+    @VisibleForTesting
+    static final long SKIP_BUFFER_MS = 3000;
 
-    /** Never seek to less than this far into a segment; a shorter jump is not worth doing. */
-    private static final long MIN_SKIP_MS = 1000;
+    /** A jump shorter than this is not worth doing; such a segment simply plays. */
+    @VisibleForTesting
+    static final long MIN_SKIP_MS = 3000;
 
     /** Never seek to within this of the end of the episode; that is what skipping is for. */
     private static final long END_GUARD_MS = 1000;
@@ -79,6 +98,9 @@ class PlaybackServiceAdSkipper {
 
     @Nullable
     private Disposable segmentLoader;
+
+    @Nullable
+    private Disposable chapterSegmentWriter;
 
     PlaybackServiceAdSkipper(PlaybackService service) {
         this.service = service;
@@ -102,6 +124,31 @@ class PlaybackServiceAdSkipper {
         segmentsItemId = itemId;
         load(itemId);
         enqueueAnalysisIfNeeded(playable);
+        onChaptersLoaded(playable);
+    }
+
+    /**
+     * Stores the ad segments the playable's loaded chapters call for (chapters titled "Sponsor",
+     * "Ad break" and so on), replacing the episode's chapter segments when they differ. Does
+     * nothing until the chapters are loaded, or when ads are off for the episode.
+     */
+    void onChaptersLoaded(@Nullable Playable playable) {
+        long itemId = itemIdOf(playable);
+        if (playable == null || itemId == 0 || playable.getChapters() == null
+                || playable.getChapters().isEmpty() || !AdSkipUtils.isAdSkipEnabled(playable)) {
+            return;
+        }
+        List<AdSegment> wanted = ChapterAdMatcher.match(new ArrayList<>(playable.getChapters()),
+                playable.getDuration(), itemId);
+        if (chapterSegmentWriter != null) {
+            chapterSegmentWriter.dispose();
+        }
+        chapterSegmentWriter = Completable
+                .fromAction(() -> AdAnalysisWorker.replaceChapterSegmentsIfChanged(itemId, wanted))
+                .subscribeOn(Schedulers.io())
+                .subscribe(() -> { }, error -> Log.e(TAG,
+                        "Could not store the chapter ad segments of episode " + itemId, error));
+        service.addServiceDisposable(chapterSegmentWriter);
     }
 
     /**
@@ -152,6 +199,7 @@ class PlaybackServiceAdSkipper {
         if (feedId == 0) {
             // skipIfNecessary resolves the default on every tick; only the analysis may be due.
             enqueueAnalysisIfNeeded(playable);
+            onChaptersLoaded(playable);
             return;
         }
         FeedPreferences preferences = feedPreferencesOf(playable);
@@ -170,6 +218,7 @@ class PlaybackServiceAdSkipper {
                             preferences.setAdSkipOverride(override[0]);
                             if (playable == service.getPlayable()) {
                                 enqueueAnalysisIfNeeded(playable);
+                                onChaptersLoaded(playable);
                             }
                         },
                         error -> Log.e(TAG, "Could not reload the ad-skip setting of feed "
@@ -213,7 +262,7 @@ class PlaybackServiceAdSkipper {
         }
 
         long target = skipTarget(segment, duration);
-        if (target <= position) {
+        if (target - position < MIN_SKIP_MS) {
             return;
         }
         Log.d(TAG, "Skipping ad segment " + segment + " to " + target);
@@ -251,7 +300,7 @@ class PlaybackServiceAdSkipper {
             service.mediaPlayer.skip();
             return;
         }
-        long target = skipTarget(segment, duration);
+        long target = manualSkipTarget(segment, position, duration);
         if (target <= position) {
             return;
         }
@@ -322,9 +371,17 @@ class PlaybackServiceAdSkipper {
             if (!AdSkipUtils.meetsThreshold(segment, minConfidence)) {
                 continue;
             }
+            if (!isLongEnoughToSkip(segment)) {
+                continue;
+            }
+            long skipFrom = segment.getStartMs() + SKIP_BUFFER_MS;
+            if (positionMs < skipFrom) {
+                // Still in the lead-in that is played on purpose; the skip comes once it is over.
+                return null;
+            }
             float effectiveSpeed = speed > 0 ? speed : 1f;
             long window = (long) (ENTRY_WINDOW_MS * effectiveSpeed);
-            if (positionMs - segment.getStartMs() <= window) {
+            if (positionMs - skipFrom <= window) {
                 return segment;
             }
             // The listener is in the middle of this segment without having played into it, so
@@ -335,17 +392,37 @@ class PlaybackServiceAdSkipper {
         return null;
     }
 
+    /** True when the segment leaves at least {@link #MIN_SKIP_MS} between its two margins. */
+    @VisibleForTesting
+    static boolean isLongEnoughToSkip(@NonNull AdSegment segment) {
+        return segment.getDurationMs() - 2 * SKIP_BUFFER_MS >= MIN_SKIP_MS;
+    }
+
     /**
-     * Where to seek to in order to leave a segment behind: just inside its end, never so close to
-     * its start that the jump is pointless, and never past the very end of the episode.
+     * Where to seek to in order to leave a segment behind: {@link #SKIP_BUFFER_MS} before its end,
+     * and never past the very end of the episode.
      */
     @VisibleForTesting
     static long skipTarget(@NonNull AdSegment segment, long durationMs) {
-        long target = Math.max(segment.getEndMs() - END_NUDGE_MS, segment.getStartMs() + MIN_SKIP_MS);
-        if (durationMs > 0) {
-            target = Math.min(target, durationMs - END_GUARD_MS);
+        return clampToEpisode(segment.getEndMs() - SKIP_BUFFER_MS, durationMs);
+    }
+
+    /**
+     * Where the "skip ad" button lands: like {@link #skipTarget}, except that inside the closing
+     * margin (or in a segment shorter than both margins) it goes to the segment's end, because
+     * the listener asked to get past the ad.
+     */
+    @VisibleForTesting
+    static long manualSkipTarget(@NonNull AdSegment segment, long positionMs, long durationMs) {
+        long target = segment.getEndMs() - SKIP_BUFFER_MS;
+        if (target <= positionMs) {
+            target = segment.getEndMs();
         }
-        return target;
+        return clampToEpisode(target, durationMs);
+    }
+
+    private static long clampToEpisode(long target, long durationMs) {
+        return durationMs > 0 ? Math.min(target, durationMs - END_GUARD_MS) : target;
     }
 
     /** True when nothing but the tail of the episode is left after the segment. */
@@ -374,6 +451,10 @@ class PlaybackServiceAdSkipper {
         if (segmentLoader != null) {
             segmentLoader.dispose();
             segmentLoader = null;
+        }
+        if (chapterSegmentWriter != null) {
+            chapterSegmentWriter.dispose();
+            chapterSegmentWriter = null;
         }
         segments = Collections.emptyList();
         segmentsItemId = 0;

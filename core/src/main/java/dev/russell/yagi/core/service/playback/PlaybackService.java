@@ -656,6 +656,9 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         public void onChapterLoaded(Playable media) {
             sendNotificationBroadcast(NOTIFICATION_TYPE_RELOAD, 0);
             customActions.refreshIfChanged();
+            if (media == getPlayable()) {
+                adSkipper.onChaptersLoaded(media);
+            }
         }
     };
 

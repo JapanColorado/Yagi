@@ -7,8 +7,11 @@ import android.os.ParcelFileDescriptor;
 import android.text.TextUtils;
 import android.util.Log;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import dev.russell.yagi.model.feed.Chapter;
 import dev.russell.yagi.core.feed.ChapterMerger;
+import dev.russell.yagi.core.feed.DescriptionChapterParser;
+import dev.russell.yagi.model.feed.FeedItem;
 import dev.russell.yagi.model.feed.FeedMedia;
 import dev.russell.yagi.core.service.download.PodcastHttpClient;
 import dev.russell.yagi.core.storage.DBReader;
@@ -96,12 +99,63 @@ public class ChapterUtils {
         List<Chapter> chaptersFromMediaFile = ChapterUtils.loadChaptersFromMediaFile(playable, context);
         List<Chapter> chaptersMergePhase1 = ChapterMerger.merge(chaptersFromDatabase, chaptersFromMediaFile);
         List<Chapter> chapters = ChapterMerger.merge(chaptersMergePhase1, chaptersFromPodcastIndex);
+        if ((chapters == null || chapters.isEmpty()) && playable instanceof FeedMedia) {
+            chapters = loadChaptersFromDescription(((FeedMedia) playable).getItem(),
+                    playable.getDuration());
+        }
         if (chapters == null) {
             // Do not try loading again. There are no chapters.
             playable.setChapters(Collections.emptyList());
         } else {
             playable.setChapters(chapters);
         }
+    }
+
+    /**
+     * The chapters of an episode that do not need its media file: the ones stored with it (from
+     * the feed, or read from the file when it was downloaded) merged with its Podcasting 2.0
+     * chapter file, or, when neither has any, the chapter list in its description. Reads the
+     * database and may fetch the chapter file, so call it off the main thread.
+     *
+     * @return the chapters, or null when there are none
+     */
+    @Nullable
+    public static List<Chapter> loadChaptersWithoutMediaFile(@Nullable FeedItem item, long durationMs) {
+        if (item == null) {
+            return null;
+        }
+        List<Chapter> stored = item.getChapters() != null ? item.getChapters()
+                : DBReader.loadChaptersOfFeedItem(item);
+        List<Chapter> fromPodcastIndex = null;
+        if (!TextUtils.isEmpty(item.getPodcastIndexChapterUrl())) {
+            fromPodcastIndex = loadChaptersFromUrl(item.getPodcastIndexChapterUrl());
+        }
+        List<Chapter> chapters = ChapterMerger.merge(
+                stored != null ? new ArrayList<>(stored) : null, fromPodcastIndex);
+        if (chapters == null || chapters.isEmpty()) {
+            chapters = loadChaptersFromDescription(item, durationMs);
+        }
+        return chapters;
+    }
+
+    /**
+     * The chapter list written into an episode's description ("00:00 Intro" lines), or null when
+     * it has none. Loads the description from the database when the item does not carry it.
+     */
+    @Nullable
+    public static List<Chapter> loadChaptersFromDescription(@Nullable FeedItem item, long durationMs) {
+        if (item == null) {
+            return null;
+        }
+        if (item.getDescription() == null && item.getId() > 0) {
+            DBReader.loadDescriptionOfFeedItem(item);
+        }
+        List<Chapter> chapters = DescriptionChapterParser.parse(item.getDescription(), durationMs);
+        if (chapters != null) {
+            Log.i(TAG, "Read " + chapters.size() + " chapters from the description of "
+                    + item.getTitle());
+        }
+        return chapters;
     }
 
     public static List<Chapter> loadChaptersFromMediaFile(Playable playable, Context context) {

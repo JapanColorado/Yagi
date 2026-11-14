@@ -44,35 +44,41 @@ public class PlaybackServiceAdSkipperTest {
     // ------------------------------------------------------------ entering a segment
 
     @Test
-    public void playingIntoASegmentSkipsIt() {
+    public void playingIntoASegmentSkipsItOnceTheLeadInIsOver() {
         AdSegment ad = detected(1, 60_000, 120_000, 0.9f);
         AdSegment found = PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), suppressed, 61_000, 1f, MEDIUM_CONFIDENCE);
+                list(ad), suppressed, 63_500, 1f, MEDIUM_CONFIDENCE);
         assertSame(ad, found);
     }
 
     @Test
-    public void aPositionExactlyAtTheStartSkips() {
+    public void theLeadInPlaysWithoutSuppressingTheSegment() {
         AdSegment ad = detected(1, 60_000, 120_000, 0.9f);
-        assertSame(ad, PlaybackServiceAdSkipper.findSegmentToSkip(
+        assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
                 list(ad), suppressed, 60_000, 1f, MEDIUM_CONFIDENCE));
+        assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
+                list(ad), suppressed, 62_900, 1f, MEDIUM_CONFIDENCE));
+        assertTrue(suppressed.isEmpty());
+        // Exactly SKIP_BUFFER_MS in, the skip is due.
+        assertSame(ad, PlaybackServiceAdSkipper.findSegmentToSkip(list(ad), suppressed,
+                60_000 + PlaybackServiceAdSkipper.SKIP_BUFFER_MS, 1f, MEDIUM_CONFIDENCE));
     }
 
     @Test
     public void theEntryWindowGrowsWithThePlaybackSpeed() {
         AdSegment ad = detected(1, 60_000, 120_000, 0.9f);
-        // 4.5 s in: outside the window at 1x, inside it at 2x.
+        // 4.5 s after the skip was due: outside the window at 1x, inside it at 2x.
         assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), new HashSet<>(), 64_500, 1f, MEDIUM_CONFIDENCE));
+                list(ad), new HashSet<>(), 67_500, 1f, MEDIUM_CONFIDENCE));
         assertSame(ad, PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), new HashSet<>(), 64_500, 2f, MEDIUM_CONFIDENCE));
+                list(ad), new HashSet<>(), 67_500, 2f, MEDIUM_CONFIDENCE));
     }
 
     @Test
     public void anUnknownSpeedIsTreatedAsNormalSpeed() {
         AdSegment ad = detected(1, 60_000, 120_000, 0.9f);
         assertSame(ad, PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), suppressed, 62_000, 0f, MEDIUM_CONFIDENCE));
+                list(ad), suppressed, 65_000, 0f, MEDIUM_CONFIDENCE));
     }
 
     // ---------------------------------------------------------- seeking into a segment
@@ -86,7 +92,7 @@ public class PlaybackServiceAdSkipperTest {
 
         // ... and it stays suppressed even once playback reaches its start window again.
         assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), suppressed, 60_500, 1f, MEDIUM_CONFIDENCE));
+                list(ad), suppressed, 63_500, 1f, MEDIUM_CONFIDENCE));
     }
 
     @Test
@@ -94,7 +100,7 @@ public class PlaybackServiceAdSkipperTest {
         AdSegment ad = detected(1, 60_000, 120_000, 0.9f);
         suppressed.add(1L);
         assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), suppressed, 60_500, 1f, MEDIUM_CONFIDENCE));
+                list(ad), suppressed, 63_500, 1f, MEDIUM_CONFIDENCE));
     }
 
     // ------------------------------------------------------------- filters
@@ -104,7 +110,7 @@ public class PlaybackServiceAdSkipperTest {
         AdSegment ad = new AdSegment(1, ITEM_ID, 60_000, 120_000,
                 AdSegment.Source.DETECTED, 0.9f, false);
         assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), suppressed, 60_500, 1f, MEDIUM_CONFIDENCE));
+                list(ad), suppressed, 63_500, 1f, MEDIUM_CONFIDENCE));
         assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
                 list(ad), suppressed, 90_000, 1f, MEDIUM_CONFIDENCE));
         assertFalse(suppressed.contains(1L));
@@ -114,23 +120,35 @@ public class PlaybackServiceAdSkipperTest {
     public void aDetectedSegmentBelowTheThresholdIsIgnored() {
         AdSegment ad = detected(1, 60_000, 120_000, 0.5f);
         assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), suppressed, 60_500, 1f, MEDIUM_CONFIDENCE));
+                list(ad), suppressed, 63_500, 1f, MEDIUM_CONFIDENCE));
         assertFalse(suppressed.contains(1L));
 
         // The same segment skips once the user raises the sensitivity.
         assertSame(ad, PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(ad), suppressed, 60_500, 1f, 0.45f));
+                list(ad), suppressed, 63_500, 1f, 0.45f));
     }
 
     @Test
     public void chapterAndManualSegmentsSkipRegardlessOfTheThreshold() {
         AdSegment chapter = segment(1, 60_000, 120_000, AdSegment.Source.CHAPTER, 0f);
         assertSame(chapter, PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(chapter), new HashSet<>(), 60_500, 1f, 0.99f));
+                list(chapter), new HashSet<>(), 63_500, 1f, 0.99f));
 
         AdSegment manual = segment(2, 60_000, 120_000, AdSegment.Source.MANUAL, 0f);
         assertSame(manual, PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(manual), new HashSet<>(), 60_500, 1f, 0.99f));
+                list(manual), new HashSet<>(), 63_500, 1f, 0.99f));
+    }
+
+    @Test
+    public void aSegmentTooShortForBothMarginsPlays() {
+        // 8 s: the two 3 s margins would leave a 2 s jump.
+        AdSegment shortAd = detected(1, 60_000, 68_000, 0.9f);
+        assertFalse(PlaybackServiceAdSkipper.isLongEnoughToSkip(shortAd));
+        assertNull(PlaybackServiceAdSkipper.findSegmentToSkip(
+                list(shortAd), suppressed, 63_500, 1f, MEDIUM_CONFIDENCE));
+        assertTrue(suppressed.isEmpty());
+
+        assertTrue(PlaybackServiceAdSkipper.isLongEnoughToSkip(detected(2, 60_000, 69_000, 0.9f)));
     }
 
     @Test
@@ -147,34 +165,40 @@ public class PlaybackServiceAdSkipperTest {
         AdSegment first = detected(1, 10_000, 20_000, 0.9f);
         AdSegment second = detected(2, 60_000, 120_000, 0.9f);
         assertSame(second, PlaybackServiceAdSkipper.findSegmentToSkip(
-                list(first, second), suppressed, 60_500, 1f, MEDIUM_CONFIDENCE));
+                list(first, second), suppressed, 63_500, 1f, MEDIUM_CONFIDENCE));
     }
 
     // ------------------------------------------------------------- the skip target
 
     @Test
-    public void theTargetLandsJustInsideTheEndOfTheSegment() {
-        assertEquals(119_500,
+    public void theTargetLandsTheBufferBeforeTheEndOfTheSegment() {
+        assertEquals(117_000,
                 PlaybackServiceAdSkipper.skipTarget(detected(1, 60_000, 120_000, 0.9f), 3_600_000));
-    }
-
-    @Test
-    public void aVeryShortSegmentStillJumpsPastItsStart() {
-        // end - 500 would be before start + 1000, so the floor wins.
-        assertEquals(61_000,
-                PlaybackServiceAdSkipper.skipTarget(detected(1, 60_000, 60_800, 0.9f), 3_600_000));
     }
 
     @Test
     public void theTargetNeverGetsWithinASecondOfTheEndOfTheEpisode() {
         assertEquals(119_000,
-                PlaybackServiceAdSkipper.skipTarget(detected(1, 60_000, 120_000, 0.9f), 120_000));
+                PlaybackServiceAdSkipper.skipTarget(detected(1, 60_000, 125_000, 0.9f), 120_000));
     }
 
     @Test
     public void anUnknownDurationDoesNotClampTheTarget() {
-        assertEquals(119_500,
+        assertEquals(117_000,
                 PlaybackServiceAdSkipper.skipTarget(detected(1, 60_000, 120_000, 0.9f), 0));
+    }
+
+    @Test
+    public void theSkipButtonLandsTheBufferBeforeTheEnd() {
+        AdSegment ad = detected(1, 60_000, 120_000, 0.9f);
+        assertEquals(117_000, PlaybackServiceAdSkipper.manualSkipTarget(ad, 60_500, 3_600_000));
+    }
+
+    @Test
+    public void theSkipButtonInsideTheClosingMarginGoesToTheEnd() {
+        AdSegment ad = detected(1, 60_000, 120_000, 0.9f);
+        assertEquals(120_000, PlaybackServiceAdSkipper.manualSkipTarget(ad, 118_000, 3_600_000));
+        assertEquals(119_000, PlaybackServiceAdSkipper.manualSkipTarget(ad, 118_000, 120_000));
     }
 
     @Test

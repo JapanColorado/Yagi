@@ -27,6 +27,7 @@ import dev.russell.yagi.core.ClientConfig;
 import dev.russell.yagi.core.R;
 import dev.russell.yagi.core.feed.util.AdSkipUtils;
 import dev.russell.yagi.core.pref.Prefs;
+import dev.russell.yagi.core.util.ChapterUtils;
 import dev.russell.yagi.core.util.ui.NotificationUtils;
 import dev.russell.yagi.core.storage.DBReader;
 import dev.russell.yagi.core.storage.DBWriter;
@@ -96,6 +97,7 @@ public class AdAnalysisWorker extends Worker {
         // an episode played right after its download can skip labelled breaks immediately.
         List<Chapter> chapters = loadChapters(item);
         storeChapterSegments(item, chapters);
+        boolean hasChapters = chapters != null && !chapters.isEmpty();
 
         // The transcript is quick to read (a download and at most one request to Claude), and for
         // a streamed episode it is all there is; its findings are published before the audio's.
@@ -140,6 +142,11 @@ public class AdAnalysisWorker extends Worker {
         }
 
         AdSegment.Source[] stored = transcript != null ? ALL_ANALYSED_SOURCES : AUDIO_SOURCES;
+        if (!hasChapters) {
+            // Chapters this run could not see (read from a streamed file by the player) keep
+            // the segments the player stored for them.
+            stored = without(stored, AdSegment.Source.CHAPTER);
+        }
         if (!store(item, segments, stored, media)) {
             return Result.failure();
         }
@@ -166,6 +173,18 @@ public class AdAnalysisWorker extends Worker {
     /** What a transcript reading replaces. */
     private static final AdSegment.Source[] TRANSCRIPT_SOURCES = {
             AdSegment.Source.TRANSCRIPT, AdSegment.Source.SELF_PROMO};
+
+    @NonNull
+    private static AdSegment.Source[] without(@NonNull AdSegment.Source[] sources,
+                                              @NonNull AdSegment.Source dropped) {
+        List<AdSegment.Source> kept = new ArrayList<>(sources.length);
+        for (AdSegment.Source source : sources) {
+            if (source != dropped) {
+                kept.add(source);
+            }
+        }
+        return kept.toArray(new AdSegment.Source[0]);
+    }
 
     /** Stores the transcript's findings, trimmed where chapters overrule them. */
     private static boolean storeTranscriptSegments(@NonNull FeedItem item,
@@ -271,8 +290,9 @@ public class AdAnalysisWorker extends Worker {
      * Stores the chapter-derived ad segments of one episode without decoding any audio.
      *
      * <p>This is the cheap half of detection and the only half a streamed episode can get. It
-     * reads the chapters (from the item, or from the database when the item does not carry them)
-     * and replaces the episode's {@link AdSegment.Source#CHAPTER} segments; detected and manual
+     * reads the chapters (from the item, or from the database when the item does not carry them,
+     * merged with the Podcasting 2.0 chapter file, else the chapter list in the description) and
+     * replaces the episode's {@link AdSegment.Source#CHAPTER} segments; detected and manual
      * segments are untouched. Both the database read and the write run on the caller's thread and
      * the shared database executor respectively, so call this off the main thread.
      */
@@ -285,9 +305,61 @@ public class AdAnalysisWorker extends Worker {
 
     private static void storeChapterSegments(@NonNull FeedItem item,
                                              @Nullable List<Chapter> chapters) {
+        if (chapters == null || chapters.isEmpty()) {
+            // Nothing to go on here; the player stores what chapters it reads from the file.
+            return;
+        }
         long durationMs = item.getMedia() != null ? item.getMedia().getDuration() : 0;
-        List<AdSegment> fromChapters = ChapterAdMatcher.match(chapters, durationMs, item.getId());
-        DBWriter.replaceAdSegments(item.getId(), AdSegment.Source.CHAPTER, fromChapters);
+        replaceChapterSegmentsIfChanged(item.getId(),
+                ChapterAdMatcher.match(chapters, durationMs, item.getId()));
+    }
+
+    /**
+     * Makes {@code wanted} the episode's {@link AdSegment.Source#CHAPTER} segments, unless they
+     * already are (same starts and ends), so that playing an episode again does not rewrite its
+     * rows and post a change. A segment the listener switched off stays off when the same range
+     * comes back. Reads the database on the caller's thread: call it off the main thread.
+     */
+    public static void replaceChapterSegmentsIfChanged(long feedItemId,
+                                                       @NonNull List<AdSegment> wanted) {
+        List<AdSegment> current = new ArrayList<>();
+        for (AdSegment segment : DBReader.loadAdSegmentsOfFeedItem(feedItemId)) {
+            if (segment.getSource() == AdSegment.Source.CHAPTER) {
+                current.add(segment);
+            }
+        }
+        if (sameRanges(current, wanted)) {
+            return;
+        }
+        for (AdSegment segment : wanted) {
+            for (AdSegment old : current) {
+                if (!old.isEnabled() && old.getStartMs() == segment.getStartMs()
+                        && old.getEndMs() == segment.getEndMs()) {
+                    segment.setEnabled(false);
+                }
+            }
+        }
+        DBWriter.replaceAdSegments(feedItemId, AdSegment.Source.CHAPTER, wanted);
+    }
+
+    /** True when both lists cover the same ranges, in any order. */
+    static boolean sameRanges(@NonNull List<AdSegment> a, @NonNull List<AdSegment> b) {
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (AdSegment x : a) {
+            boolean found = false;
+            for (AdSegment y : b) {
+                if (x.getStartMs() == y.getStartMs() && x.getEndMs() == y.getEndMs()) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -341,10 +413,8 @@ public class AdAnalysisWorker extends Worker {
 
     @Nullable
     private static List<Chapter> loadChapters(@NonNull FeedItem item) {
-        if (item.getChapters() != null) {
-            return item.getChapters();
-        }
-        return DBReader.loadChaptersOfFeedItem(item);
+        long durationMs = item.getMedia() != null ? item.getMedia().getDuration() : 0;
+        return ChapterUtils.loadChaptersWithoutMediaFile(item, durationMs);
     }
 
     @NonNull
