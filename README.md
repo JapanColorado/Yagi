@@ -8,9 +8,12 @@ Yagi started as FocusPodcast: this repository is an independent, F-Droid-style f
 - vendors its former submodules in-tree and keeps the whole codebase under `dev.russell.yagi.*`;
 - has an English-only source tree (translations for Chinese and Japanese are kept);
 - enforces a set of quality gates in CI-style checks: zero Kotlin `!!`, zero `printStackTrace`, no empty catch blocks, every Rx chain with an error handler, detekt with no baseline, and a JVM unit-test suite;
+- adds **ad auto-skip** from on-device audio analysis and transcripts, a **"Clear voice"** enhancer with its own FFT and de-esser, transcripts, bookmarks, an audiobook library and a rebuilt video player;
 - is not published on Google Play. Upstream's F-Droid listing is not this fork; build it yourself or install a release APK from this repository.
 
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" alt="Screenshot 1" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" alt="Screenshot 2" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" alt="Screenshot 3" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" alt="Screenshot 4" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" alt="Screenshot 5" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" alt="Screenshot 6" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/7.png" alt="Screenshot 7" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/8.png" alt="Screenshot 8" height="200"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/9.png" alt="Screenshot 9" height="200">
+
+*These screenshots are upstream FocusPodcast's and predate the fork; new ones are on the to-do list.*
 
 ## Features
 
@@ -43,6 +46,10 @@ Yagi collects nothing and has no server; see [PRIVACY.md](PRIVACY.md) for what i
 ## License
 
 Yagi is licensed under the GNU General Public License (GPL-3.0). You can find the license text in the LICENSE file.
+
+## How this was built
+
+Built with [Claude Code](https://claude.com/claude-code), and most of the fork's commits say so. I decide what to make, write the specification, review the changes and use the result every day.
 
 ## Building
 
