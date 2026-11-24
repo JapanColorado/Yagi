@@ -11,6 +11,8 @@ import org.greenrobot.eventbus.EventBus
 /**
  * Podcast filter of the Library page. The choice is stored in [Prefs.subscriptionsFilter] and
  * applied through [UnreadItemsUpdateEvent], which makes the Library (and the drawer) reload.
+ * "Has new episodes" also hides finished audiobooks from the Library's audiobook row
+ * ([dev.russell.yagi.adapter.AudiobookEntry.loadForLibrary]); the count shown here is podcasts only.
  */
 class SubscriptionFilterSheet : FilterSheet() {
 

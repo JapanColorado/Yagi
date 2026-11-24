@@ -373,7 +373,7 @@ class SubFeedsFragment : Fragment(), Toolbar.OnMenuItemClickListener, OnSelectMo
         disposable = Observable.fromCallable {
             Pair(
                 loadDrawerItems(),
-                if (withShelf) AudiobookEntry.load() else emptyList()
+                if (withShelf) AudiobookEntry.loadForLibrary() else emptyList()
             )
         }
             .subscribeOn(Schedulers.io())
@@ -404,7 +404,7 @@ class SubFeedsFragment : Fragment(), Toolbar.OnMenuItemClickListener, OnSelectMo
     private fun loadShelf() {
         val shelf = shelfAdapter ?: return
         shelfDisposable?.dispose()
-        shelfDisposable = Observable.fromCallable { AudiobookEntry.load() }
+        shelfDisposable = Observable.fromCallable { AudiobookEntry.loadForLibrary() }
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(

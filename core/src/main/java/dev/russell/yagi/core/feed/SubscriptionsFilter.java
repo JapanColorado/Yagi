@@ -70,6 +70,14 @@ public class SubscriptionsFilter {
     }
 
     /**
+     * Whether only feeds with new episodes are shown ("Has new episodes"). The Library page also
+     * leaves finished audiobooks out of its audiobook row then.
+     */
+    public boolean isShowIfCounterGreaterZero() {
+        return showIfCounterGreaterZero;
+    }
+
+    /**
      * Run a list of feed items through the filter.
      */
     public List<Feed> filter(List<Feed> items, LongIntMap feedCounters) {

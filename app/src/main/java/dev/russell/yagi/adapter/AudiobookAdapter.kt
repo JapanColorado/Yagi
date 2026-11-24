@@ -3,6 +3,7 @@ package dev.russell.yagi.adapter
 import dev.russell.yagi.R
 import dev.russell.yagi.actionbuttons.ItemActionButton
 import dev.russell.yagi.activity.MainActivity
+import dev.russell.yagi.core.pref.Prefs
 import dev.russell.yagi.core.storage.DBReader
 import dev.russell.yagi.core.util.Converter
 import dev.russell.yagi.databinding.AudiobookItemBinding
@@ -30,6 +31,20 @@ class AudiobookEntry(val feed: Feed, val progress: AudiobookProgress?) {
             return DBReader.getAudiobookFeeds()
                 .map { AudiobookEntry(it, progress[it.id]) }
                 .sortedBy { it.progress?.isFinished == true }
+        }
+
+        /**
+         * The books for the Library page's row: [load], without the finished ones while the
+         * Library's "Has new episodes" filter is on (a finished book has nothing new to offer).
+         */
+        @JvmStatic
+        @WorkerThread
+        fun loadForLibrary(): List<AudiobookEntry> {
+            val books = load()
+            if (!Prefs.subscriptionsFilter.isShowIfCounterGreaterZero) {
+                return books
+            }
+            return books.filterNot { it.progress?.isFinished == true }
         }
     }
 }
